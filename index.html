@@ -1,0 +1,1572 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>MICS 360 — AB InBev</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-app-compat.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/firebase/10.7.1/firebase-firestore-compat.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+
+<style>
+  html, body { margin:0; padding:0; background:#000; }
+  #root { min-height:100vh; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script>
+  // ─── CONFIGURAÇÃO DO FIREBASE ───
+  const firebaseConfig = {
+    apiKey: "AIzaSyBB1IMuR0XwIXe1WjVV7XR4krQMp7goORo",
+    authDomain: "mics-controls.firebaseapp.com",
+    projectId: "mics-controls",
+    storageBucket: "mics-controls.firebasestorage.app",
+    messagingSenderId: "953031036844",
+    appId: "1:953031036844:web:4a290eee2ffde89d3cb409"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
+
+  // Substitui window.storage.get/set por leitura/escrita no Firestore
+  window.storageGet = async function (key) {
+    const snap = await db.collection('mics360store').doc(key).get();
+    if (!snap.exists) return null;
+    return { value: snap.data().value };
+  };
+  window.storageSet = async function (key, value) {
+    await db.collection('mics360store').doc(key).set({ value: value, updatedAt: new Date().toISOString() });
+    return { key, value };
+  };
+</script>
+
+<script type="text/babel" data-presets="react">
+const { useState, useRef, useEffect, useMemo } = React;
+
+/* ───────────────────────── Ícones (SVG de linha, sem dependência externa) ───────────────────────── */
+function Icon(props) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={props.className}>
+      {props.children}
+    </svg>
+  );
+}
+const Upload = (p) => <Icon className={p.className}><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></Icon>;
+const Trash2 = (p) => <Icon className={p.className}><polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" /><line x1="10" y1="11" x2="10" y2="17" /><line x1="14" y1="11" x2="14" y2="17" /></Icon>;
+const Calendar = (p) => <Icon className={p.className}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></Icon>;
+const FileSpreadsheet = (p) => <Icon className={p.className}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="8" y1="13" x2="16" y2="13" /><line x1="8" y1="17" x2="16" y2="17" /></Icon>;
+const CheckCircle2 = (p) => <Icon className={p.className}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></Icon>;
+const AlertCircle = (p) => <Icon className={p.className}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></Icon>;
+const Settings = (p) => <Icon className={p.className}><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></Icon>;
+const X = (p) => <Icon className={p.className}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></Icon>;
+const Plus = (p) => <Icon className={p.className}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></Icon>;
+const Files = (p) => <Icon className={p.className}><path d="M15 2H8a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z" /><polyline points="15 2 15 8 21 8" /><path d="M4 6v14a2 2 0 0 0 2 2h9" /></Icon>;
+const Home = (p) => <Icon className={p.className}><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" /><polyline points="9 22 9 12 15 12 15 22" /></Icon>;
+const Lock = (p) => <Icon className={p.className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></Icon>;
+const Unlock = (p) => <Icon className={p.className}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 9.9-1" /></Icon>;
+const LogOut = (p) => <Icon className={p.className}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></Icon>;
+const ArrowLeft = (p) => <Icon className={p.className}><line x1="19" y1="12" x2="5" y2="12" /><polyline points="12 19 5 12 12 5" /></Icon>;
+const Users = (p) => <Icon className={p.className}><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
+const ShieldCheck = (p) => <Icon className={p.className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><polyline points="9 12 11 14 15 10" /></Icon>;
+const ShieldOff = (p) => <Icon className={p.className}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Icon>;
+const Search = (p) => <Icon className={p.className}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></Icon>;
+const Pencil = (p) => <Icon className={p.className}><path d="M12 20h9" /><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4z" /></Icon>;
+const Save = (p) => <Icon className={p.className}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></Icon>;
+const Ban = (p) => <Icon className={p.className}><circle cx="12" cy="12" r="10" /><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" /></Icon>;
+const BookOpen = (p) => <Icon className={p.className}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z" /><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z" /></Icon>;
+const KeyRound = (p) => <Icon className={p.className}><path d="M2 18v3c0 .6.4 1 1 1h4v-3h3v-3h2l1.4-1.4a6.5 6.5 0 1 0-4-4Z" /><circle cx="16.5" cy="7.5" r=".5" fill="currentColor" /></Icon>;
+const Target = (p) => <Icon className={p.className}><circle cx="12" cy="12" r="10" /><circle cx="12" cy="12" r="6" /><circle cx="12" cy="12" r="2" /></Icon>;
+const ListChecks = (p) => <Icon className={p.className}><path d="m3 17 2 2 4-4" /><path d="M3 7l2 2 4-4" /><path d="M13 6h8" /><path d="M13 12h8" /><path d="M13 18h8" /></Icon>;
+const AlertTriangle = (p) => <Icon className={p.className}><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z" /><path d="M12 9v4" /><path d="M12 17h.01" /></Icon>;
+const FileCheck2 = (p) => <Icon className={p.className}><path d="M4 22h14a2 2 0 0 0 2-2V7.5L14.5 2H6a2 2 0 0 0-2 2v4" /><polyline points="14 2 14 8 20 8" /><path d="m3 15 2 2 4-4" /></Icon>;
+const CalendarClock = (p) => <Icon className={p.className}><path d="M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h3.5" /><path d="M16 2v4" /><path d="M8 2v4" /><path d="M3 10h5" /><circle cx="18" cy="17" r="5" /><path d="M18 15v2l1 1" /></Icon>;
+const PieChartIcon = (p) => <Icon className={p.className}><path d="M21.21 15.89A10 10 0 1 1 8 2.83" /><path d="M22 12A10 10 0 0 0 12 2v10z" /></Icon>;
+
+/* ───────────────────────── Shared helpers ───────────────────────── */
+
+function formatPeriodLabel(key) {
+  const [y, m] = key.split('-');
+  const names = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return names[parseInt(m, 10) - 1] + '/' + y;
+}
+
+/* ───────────────────────── Monitoring helpers ───────────────────────── */
+
+const DEFAULT_COLUMN_ALIASES = {
+  aplicacao: ['application', 'aplicacao', 'aplicação', 'app', 'solution', 'ghq', 'it solution name', 'solution name'],
+  status: ['status', 'situacao', 'situação'],
+  mes: ['month', 'mes', 'mês'],
+  ano: ['year', 'ano'],
+};
+const COLUMN_LABELS = { aplicacao: 'Application (optional)', status: 'Status', mes: 'Month (optional)', ano: 'Year (optional)' };
+
+function withColumnDefaults(ca) {
+  const safe = {};
+  Object.keys(DEFAULT_COLUMN_ALIASES).forEach(f => { safe[f] = (ca && Array.isArray(ca[f])) ? ca[f] : DEFAULT_COLUMN_ALIASES[f]; });
+  return safe;
+}
+
+const MONTH_NAME_MAP = {
+  jan: 1, fev: 2, mar: 3, abr: 4, mai: 5, jun: 6, jul: 7, ago: 8, set: 9, out: 10, nov: 11, dez: 12,
+  january: 1, february: 2, march: 3, april: 4, may: 5, june: 6, july: 7, august: 8, september: 9, october: 10, november: 11, december: 12,
+};
+
+function parseMonthValue(v) {
+  if (v instanceof Date) return v.getMonth() + 1;
+  if (typeof v === 'number' && v >= 1 && v <= 12) return v;
+  const s = String(v || '').toLowerCase().trim();
+  const num = parseInt(s, 10);
+  if (!isNaN(num) && num >= 1 && num <= 12) return num;
+  const keys = Object.keys(MONTH_NAME_MAP);
+  for (let i = 0; i < keys.length; i++) if (s.indexOf(keys[i]) !== -1) return MONTH_NAME_MAP[keys[i]];
+  return null;
+}
+function parseYearValue(v) {
+  if (v instanceof Date) return v.getFullYear();
+  const num = parseInt(String(v || '').trim(), 10);
+  if (!isNaN(num) && num > 2000 && num < 2100) return num;
+  return null;
+}
+function extractPeriodFromFilename(name) {
+  const s = name.toLowerCase().replace(/[_\-.]+/g, ' ');
+  const yearMatch = s.match(/20\d{2}/);
+  const year = yearMatch ? parseInt(yearMatch[0], 10) : null;
+  let month = null;
+  const keys = Object.keys(MONTH_NAME_MAP);
+  for (let i = 0; i < keys.length; i++) if (s.indexOf(keys[i]) !== -1) { month = MONTH_NAME_MAP[keys[i]]; break; }
+  if (!month) {
+    const numMatch = s.match(/\b(0?[1-9]|1[0-2])\b/);
+    if (numMatch) month = parseInt(numMatch[0], 10);
+  }
+  return (month && year) ? year + '-' + String(month).padStart(2, '0') : null;
+}
+function normalizeKey(raw) {
+  return String(raw == null ? '' : raw).toLowerCase().trim().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ') || '(empty)';
+}
+function displayLabel(raw) {
+  const s = String(raw == null ? '' : raw).trim().replace(/[_\-]+/g, ' ').replace(/\s+/g, ' ');
+  if (!s) return '(empty)';
+  // Display-only renaming — matching/grouping still uses normalizeKey() on the
+  // original spreadsheet text, so imports keep reading "Pending With Reviewer" /
+  // "Not Initiated" exactly as they come from the source file.
+  const norm = s.toLowerCase();
+  if (norm === 'pending with reviewer') return 'Delivered';
+  if (norm === 'not initiated') return 'Not Delivered';
+  return s;
+}
+function colorForKey(key) {
+  const k = key.toLowerCase();
+  if (k.indexOf('not initiated') !== -1 || k.indexOf('not started') !== -1) return { text: 'text-neutral-300', bar: 'bg-neutral-400' };
+  if (k.indexOf('pending') !== -1 || k.indexOf('review') !== -1) return { text: 'text-yellow-500', bar: 'bg-yellow-500' };
+  if (k.indexOf('compliant') !== -1 || k.indexOf('closed') !== -1 || k.indexOf('done') !== -1 || k.indexOf('ok') !== -1 || k.indexOf('conforme') !== -1) return { text: 'text-emerald-400', bar: 'bg-emerald-400' };
+  if (k.indexOf('gap') !== -1 || k.indexOf('open') !== -1 || k.indexOf('overdue') !== -1 || k.indexOf('missing') !== -1) return { text: 'text-red-400', bar: 'bg-red-400' };
+  if (k.indexOf('progress') !== -1 || k.indexOf('incomplet') !== -1 || k.indexOf('partial') !== -1) return { text: 'text-orange-400', bar: 'bg-orange-400' };
+  return { text: 'text-amber-300', bar: 'bg-amber-400' };
+}
+function colorHexForKey(key) {
+  const k = key.toLowerCase();
+  if (k.indexOf('not initiated') !== -1 || k.indexOf('not started') !== -1) return '#a3a3a3';
+  if (k.indexOf('pending') !== -1 || k.indexOf('review') !== -1) return '#eab308';
+  if (k.indexOf('compliant') !== -1 || k.indexOf('closed') !== -1 || k.indexOf('done') !== -1 || k.indexOf('ok') !== -1 || k.indexOf('conforme') !== -1) return '#34d399';
+  if (k.indexOf('gap') !== -1 || k.indexOf('open') !== -1 || k.indexOf('overdue') !== -1 || k.indexOf('missing') !== -1) return '#f87171';
+  if (k.indexOf('progress') !== -1 || k.indexOf('incomplet') !== -1 || k.indexOf('partial') !== -1) return '#fb923c';
+  return '#fcd34d';
+}
+function DonutChart({ segments, total, size, thickness }) {
+  size = size || 200; thickness = thickness || 30;
+  const radius = (size - thickness) / 2;
+  const circumference = 2 * Math.PI * radius;
+  let cumulative = 0;
+  return (
+    <svg width={size} height={size} viewBox={'0 0 ' + size + ' ' + size}>
+      <g transform={'translate(' + (size / 2) + ',' + (size / 2) + ')'}>
+        <circle r={radius} fill="none" stroke="#262626" strokeWidth={thickness} />
+        {segments.map((seg, i) => {
+          const pct = total > 0 ? seg.count / total : 0;
+          if (pct <= 0) return null;
+          const dash = pct * circumference;
+          const gap = circumference - dash;
+          const rotation = cumulative * 360 - 90;
+          cumulative += pct;
+          return (
+            <circle key={i} r={radius} fill="none" stroke={seg.color} strokeWidth={thickness}
+              strokeDasharray={dash + ' ' + gap} strokeLinecap="butt" transform={'rotate(' + rotation + ')'} />
+          );
+        })}
+      </g>
+      <text x="50%" y="46%" textAnchor="middle" className="fill-white" style={{ fontSize: size * 0.13, fontWeight: 700 }}>{total}</text>
+      <text x="50%" y="58%" textAnchor="middle" className="fill-neutral-500" style={{ fontSize: size * 0.06 }}>tasks</text>
+    </svg>
+  );
+}
+
+/* ───────────────────────── Controls helpers ───────────────────────── */
+
+const DEFAULT_ALLOWED_APPS = [
+  'Capacity File', 'Cognos Controller', 'Connect GHQ', 'Disclosure Management', 'Due Diligence',
+  'Eclipse', 'Guardian', 'Hotline and Whistleblowing - Ethics & Compliance',
+  'iCertis Contract Management (ICM)', 'Interaction Log', 'IT2',
+  'Litigation Portal Tool - Power Platform', 'Microsoft Power Platform', 'OnTime', 'Pegasus',
+  'PTS Portal', 'Sensory One', 'Soda ETL', 'SODA MDM', 'SODA MDM (in-house)', 'Supply Portal',
+  'Swift', 'WMS T2 Global',
+];
+// Seed data for the 6 newly-added applications, pre-computed from "MICS Relevant - SA.xlsx"
+// (Solution Name / MICS No. / Self Assessment / Overall Status / Control Owner columns).
+// Applicable is derived from Self Assessment: any value other than "Not Applicable" = Yes.
+// On first load, these rows are auto-merged into the shared Farol dataset for any of these
+// applications that don't already have imported control rows, so they show up populated
+// without requiring a manual re-import.
+const NEW_APPS_SEED_ROWS = [{"id": "seed0", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed1", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed2", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed3", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_05", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed4", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_06-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed5", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_07-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed6", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_08-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed7", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed8", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_10-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed9", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_12", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed10", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ACCESS_13", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed11", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed12", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_BC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed13", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed14", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed15", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed16", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Fail (SA)"}, {"id": "seed17", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_IF_01-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed18", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed19", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed20", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_NW_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed21", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed22", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed23", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed24", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed25", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_07", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed26", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed27", "serviceManager": "adriano.borges-ext@ab-inbev.com", "application": "Disclosure Management", "control": "IT_SEC_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed28", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed29", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed30", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed31", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_06-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed32", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_08-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed33", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed34", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_10-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed35", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ACCESS_13", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed36", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_AI_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed37", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed38", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_BC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed39", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed40", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed41", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed42", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed43", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_IF_01-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed44", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed45", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed46", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_NW_01", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed47", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed48", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed49", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed50", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed51", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_07", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed52", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed53", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Due Diligence", "control": "IT_SEC_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed54", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed55", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed56", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed57", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_05", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed58", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_06-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed59", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_07-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed60", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_08-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed61", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed62", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_10-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed63", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_12", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed64", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ACCESS_13", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed65", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed66", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_BC_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed67", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed68", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed69", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed70", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed71", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_IF_01-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed72", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed73", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed74", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_NW_01", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed75", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed76", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed77", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed78", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed79", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_07", "applicable": "Yes", "performedBy": "", "status": "Fail (KPI)"}, {"id": "seed80", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed81", "serviceManager": "marina.assuena@ab-inbev.com", "application": "Hotline and Whistleblowing - Ethics & Compliance", "control": "IT_SEC_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed82", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed83", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed84", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed85", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed86", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_06-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed87", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_07-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed88", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_08-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed89", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed90", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_10-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed91", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_12", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed92", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ACCESS_13", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed93", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed94", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_BC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed95", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed96", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed97", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed98", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed99", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_IF_01-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed100", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed101", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed102", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_NW_01", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed103", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed104", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed105", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed106", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed107", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_07", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed108", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed109", "serviceManager": "marina.assuena@ab-inbev.com", "application": "iCertis Contract Management (ICM)", "control": "IT_SEC_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed110", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_01", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed111", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed112", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed113", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed114", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_06-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed115", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_07-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed116", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_08-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed117", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed118", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_10-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed119", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_12", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed120", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ACCESS_13", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed121", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed122", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_BC_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed123", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed124", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed125", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed126", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed127", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_IF_01-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed128", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed129", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed130", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_NW_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed131", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed132", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed133", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed134", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed135", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_07", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed136", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed137", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Litigation Portal Tool - Power Platform", "control": "IT_SEC_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed138", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_01", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed139", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_02-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed140", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_03-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed141", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed142", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_06-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed143", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_07-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed144", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_08-K", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed145", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_09", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed146", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_10-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed147", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_12", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed148", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ACCESS_13", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed149", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_BC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed150", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_BC_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed151", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_BC_03", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed152", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_CHNG_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed153", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_CHNG_02", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed154", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_CHNG_03", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed155", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_IF_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed156", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_INV_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed157", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_ISAE_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed158", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_NW_01", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed159", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_01-K", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed160", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_02", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed161", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_05", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed162", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_06", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed163", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_07", "applicable": "No", "performedBy": "", "status": "Not Applicable"}, {"id": "seed164", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_08", "applicable": "Yes", "performedBy": "", "status": "Pass"}, {"id": "seed165", "serviceManager": "marcos.satorres@ab-inbev.com", "application": "Microsoft Power Platform", "control": "IT_SEC_09", "applicable": "No", "performedBy": "", "status": "Not Applicable"}];
+const CTRL_COLUMN_ALIASES = {
+  serviceManager: ['service manager', 'sm', 'service manager name', 'control owner'],
+  application: ['application', 'app', 'solution', 'it solution name', 'ghq', 'solution name'],
+  control: ['mics control', 'control', 'mics id', 'control code', 'control id', 'mics no.', 'mics no'],
+  applicable: ['applicable?', 'applicable', 'aplicavel', 'aplicável', 'in scope'],
+  performedBy: ['performado por', 'performed by', 'executor', 'control executor'],
+  status: ['status', 'situacao', 'situação', 'overall status'],
+  selfAssessment: ['self assessment'],
+};
+const CTRL_ALIASES_FLAT = Object.keys(CTRL_COLUMN_ALIASES).reduce((acc, k) => acc.concat(CTRL_COLUMN_ALIASES[k]), []);
+
+function normalizeAppName(s) { return String(s || '').toLowerCase().trim().replace(/\s+/g, ' '); }
+function isApplicableTrue(v) {
+  const s = String(v || '').toLowerCase().trim();
+  return s === 'yes' || s === 'sim' || s === 'true' || s === 'y' || s === 'applicable';
+}
+function statusColor(v) {
+  const s = String(v || '').toLowerCase();
+  if (s.indexOf('not initiated') !== -1 || s.indexOf('not started') !== -1) return 'text-neutral-300 bg-neutral-500/10 border-neutral-500/30';
+  if (s.indexOf('pending') !== -1 || s.indexOf('review') !== -1) return 'text-yellow-500 bg-yellow-500/10 border-yellow-500/30';
+  if (s.indexOf('complet') !== -1 || s.indexOf('closed') !== -1 || s.indexOf('ok') !== -1 || s.indexOf('conforme') !== -1) return 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30';
+  if (s.indexOf('gap') !== -1 || s.indexOf('open') !== -1 || s.indexOf('overdue') !== -1) return 'text-red-400 bg-red-500/10 border-red-500/30';
+  return 'text-neutral-400 bg-neutral-500/10 border-neutral-500/30';
+}
+function findHeaderRowAndBuildObjects(sheet) {
+  const aoa = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '', raw: false });
+  let bestIdx = 0, bestScore = -1;
+  const scanLimit = Math.min(aoa.length, 15);
+  for (let i = 0; i < scanLimit; i++) {
+    const row = aoa[i] || [];
+    let score = 0;
+    row.forEach(cell => {
+      const c = String(cell || '').toLowerCase().trim();
+      if (c && CTRL_ALIASES_FLAT.indexOf(c) !== -1) score += 1;
+    });
+    if (score > bestScore) { bestScore = score; bestIdx = i; }
+  }
+  const headerRow = (aoa[bestIdx] || []).map(h => String(h || '').trim());
+  const dataRows = aoa.slice(bestIdx + 1);
+  const objects = dataRows
+    .filter(r => r.some(cell => String(cell || '').trim() !== ''))
+    .map(r => {
+      const obj = {};
+      headerRow.forEach((h, idx) => { if (h) obj[h] = r[idx] !== undefined ? r[idx] : ''; });
+      return obj;
+    });
+  return { objects, headerFound: bestScore };
+}
+
+/* ───────────────────────── Control Detail Guide data & components ───────────────────────── */
+
+const GUIDE_FREQ_COLORS = {
+  'Daily':'text-red-400 bg-red-500/10 border-red-500/30',
+  'Monthly':'text-green-400 bg-green-500/10 border-green-500/30',
+  'Quarterly':'text-blue-400 bg-blue-500/10 border-blue-500/30',
+  'Bi-Annual':'text-purple-400 bg-purple-500/10 border-purple-500/30',
+  'Annual':'text-teal-400 bg-teal-500/10 border-teal-500/30',
+  'Event-based':'text-amber-400 bg-amber-500/10 border-amber-500/30',
+};
+const GUIDE_DOMAINS=['IT ACCESS','BACKUP & BC','INTERFACE','NETWORK','CHANGE','SECURITY','INVENTORY','LICENSE','ASSURANCE','RPA','AI'];
+
+const GUIDE_CONTROLS=[
+{code:'IT_ACCESS_01',name:'Accountability & Completeness of Identity Master Data',domain:'IT ACCESS',key:false,freq:'Quarterly',sop:false,scope:'Type 1, 5 · OS · DB',what:'Accountability & Completeness of Identity Master Data. Ensures all user accounts are unique, correctly categorised and contain required reference data (Global ID, Email, ABI Sponsor Email, Owner ID).',l1:'No additional requirement (not a key control).',l2:'Generate system user list (or external list if system cannot). Verify uniqueness, classification per ABI_GIS_POLICY_ANX_3, and reference data completeness. Remediate gaps before next review cycle.',l3:'IT Solution uses an IDM tool to capture classification and reference data. Monthly review of IDM configuration by Performance Manager.',kpi:'Critical info missing in master data: L2 ≤2% / L3 ≤1%\nDuplicate user IDs: L2 ≤2% / L3 ≤1%',notes:'If system cannot generate user list with all attributes, maintain external document capturing addition & revocation of every access. Gaps persisting across consecutive reviews = control ineffective.'},
+{code:'IT_ACCESS_02-K',name:'Access Granting',domain:'IT ACCESS',key:true,freq:'Event-based + Annual',sop:false,scope:'Type 1,2,5,6,7 · OS · DB',what:'Access Granting. All access requests (new/change) must be formally documented, pre-approved and based on approved Blueprint/Whitelist. SoD conflicts checked BEFORE granting. No Critical access directly to end users.',l1:'Formally document and pre-approve all access requests. Define SoD & Sensitive Access matrix per ABI Global Ruleset (Annual). Check SoD conflicts before every grant.',l2:'Grant access only via Blueprint/Whitelist. Outside blueprint = temporary max 180 days. Blueprint reviewed and approved annually.',l3:'Access granted via WORKDAY attributes (Band, Position, Location) through IDM/GRC. All requests exclusively via workflow tool (GRC/ServiceNow). SAP: ONLY via GRC.',kpi:'Access outside blueprint >180 days: L2 ≤3% / L3 =0%\nEnd users with Critical access: L2 =0 / L3 =0\nHigh-risk users without risk owner approval: L2 =0%',notes:'⚠ Critical access (Risk Level = Critical per ABI Global Ruleset) MUST NOT be granted to end users directly — use FFID/Emergency accounts. High-risk requires risk owner approval. Zone IC approval needed if SoD matrix not applicable.'},
+{code:'IT_ACCESS_03-K',name:'Review of Critical/High Business Risk (Sensitive & SoD Access)',domain:'IT ACCESS',key:true,freq:'Annual + Event-based',sop:false,scope:'Type 1, 2 only',what:'Review of Critical/High Business Risk (Sensitive & SoD Access). Revalidation of all users holding Critical or High business risk access at least annually. Remediation within 2 weeks. Expert Users per risk domain perform the review.',l1:'Review all users with Critical/High business risk access at least once in 12 months. Revoke inappropriate access within 2 weeks (10 working days).',l2:'For large user bases (ERP) review in staggered monthly portions ensuring full coverage in 12 months. Expert Users per domain (ATR, PTP, etc.) review and revalidate. After 5 unanswered reminders: control owner revokes access.',l3:'Automated workflow tool sends notifications to Expert Users monthly. Revocation within 1 week of confirmation.',kpi:'Critical/High Business risks not remediated within 2 weeks: L2 ≤2% (0 absolute) / L3 =0%',notes:'NOT APPLICABLE if solution has no Critical/High business risk access per ABI ruleset. Zone IC must approve. Annual reviews must complete before Q3. Expert User = business risk owner, NOT line manager.'},
+{code:'IT_ACCESS_04',name:'Urgent Access Revocation of Immediately Terminated Users',domain:'IT ACCESS',key:false,freq:'Event-based',sop:false,scope:'Zone Level Control',what:'Urgent Access Revocation of Immediately Terminated Users. Ensures access of employees/3rd parties terminated with immediate effect is revoked within 2 business hours across all high-impact IT solutions.',l1:'No additional requirement (not a key control).',l2:'Access to high-impact IT solutions revoked within 2 business hours of immediate termination per defined process. Process includes: terminate Citrix/VPN sessions, disable AD credentials, disable ERP credentials, disable payment system access, revoke vault platform access. Change passwords of any shared emergency credentials the employee knew.',l3:'Automated script or tool identifies and blocks all user accounts immediately and terminates all open sessions.',kpi:'No numeric KPI defined. Evidence: signed immediate termination process document (<12 months old), evidence of immediate revocation per process.',notes:'Central point of contact (e.g. Head of IT Security) must be identified and communicated to all People Business Partners. Scope: ALL critical solutions where business impact is high.'},
+{code:'IT_ACCESS_05',name:'IT Admin – User Access Management',domain:'IT ACCESS',key:false,freq:'Event-based',sop:false,scope:'Type 1,2,6 · OS · DB',what:'IT Admin – User Access Management. Controls administrative/privileged access. Admins have configuration, maintenance, troubleshooting and user management rights — highest risk account type. Principle of Least Privilege mandatory.',l1:'No additional requirement (not a key control).',l2:'Identify elevated access not needed for routine tasks and restrict where feasible. Temporary elevated grants require business justification + prior approval from Solution Owner or Admin Group Owner. If PIM solution in use: usage logs reviewed by designated owner within 30 working days of usage.',l3:'Same as L2.',kpi:'No numeric KPI. Evidences: list of admins, approval records, usage logs reviewed within 30 days.',notes:'Admin activities (overwrite records, delete configs, reset systems) must be logged and reviewed. Emergency User IDs should be used for critical activities rather than personal end-user IDs. Admins must use unique passwords per solution. Designated owner = IT risk owner (not line manager).'},
+{code:'IT_ACCESS_06-K',name:'Review of IT Sensitive Access',domain:'IT ACCESS',key:true,freq:'Bi-Annual + Monthly (L2/L3)',sop:false,scope:'ALL Types: 1,2,3,4,5,6,7 · OS · DB',what:'Review of IT Sensitive Access. Revalidation of IT Admin/technical users with Critical or High IT risk access (Basis, Security, UAM) at least twice per year. BROADEST scope control — applies to every solution type without exception.',l1:'Review and revalidate Critical/High IT risk access at least every 6 months. Revoke inappropriate access within 2 weeks (10 working days).',l2:'For >100 users: staggered monthly review covering all users in 6 months. Treasury/sub-consolidation (Cognos, FCCS, HFM, BPC): quarterly mandatory. Expert Users per IT domain (Basis, Security, UAM).\nCloud: Users with non-read-only access to Tenants/Management Groups/Subscriptions → MONTHLY review.',l3:'Automated workflow, notifications to IT Expert Users monthly. Revocation within 1 week.',kpi:'Critical/High IT risks not remediated within 2 weeks: L2 ≤2% (0 absolute) / L3 =0%',notes:'⚠ BROADEST SCOPE — applies to ALL Types including VPN, Firewalls, Cloud, BI. Expert User = IT risk owner (Basis Expert, Security Expert), NOT line manager. NOT APPLICABLE only if solution has zero Critical/High IT risk access per ABI ruleset.'},
+{code:'IT_ACCESS_07-K',name:'Emergency User ID – Access Management (FFID/DDIC)',domain:'IT ACCESS',key:true,freq:'Event-based',sop:false,scope:'Type 1, 6 · OS · DB',what:'Emergency User ID – Access Management (FFID/DDIC). Controls the use of generic emergency accounts for Critical access. Each FFID has a designated owner. Credentials changed and locked after every use. Logs reviewed within 10 working days.',l1:'Generic Emergency User IDs (FFID, DDIC, SAPOSS) used only for Critical access. Each ID has designated owner. Access granted temporarily with documented business justification. Credentials changed and account locked after every use. Logs reviewed within 2 weeks (10 working days).',l2:'Emergency User IDs managed via global tool (SAP GRC, BeyondTrust). Logs reviewed within 5 working days. Logs maintained outside solution (SIEM) for minimum 18 months.',l3:'End-to-end workflow tool for all Emergency User lifecycle: Request, Approval, Granting, Credential Mgmt, Log Review, Audit Evidencing.',kpi:'Usage logs not reviewed within 5 working days: L2 ≤1% / L3 =0%\nFFID usage for SAP outside GRC: L2 ≤2% / L3 ≤1%\nUsage logs retained ≥18 months: Yes/No (mandatory)',notes:'Approved vault platforms: SAP GRC EAM, BeyondTrust, PIM. Non-global tools (KeePass, shared Excel) NOT compliant. Discrepancies must be reported to ABI Ethics. For SAP: DDIC, SAPOSS follow same review process as FFID.'},
+{code:'IT_ACCESS_08-K',name:'Access Removal of Employees (Leavers)',domain:'IT ACCESS',key:true,freq:'Daily + Weekly + Event-based',sop:false,scope:'Type 1,2,3,4,5 · OS · DB',what:'Access Removal of Employees (Leavers). Ensures access of terminated employees is removed within 24h of last working day. Zero tolerance — any leaver accessing system post-LWD without log review is an immediate audit finding.',l1:'Daily leavers report → revoke all access within 24h (1 working day) of LWD. Weekly report covering last 6 months → review and remediate gaps. Delay detected: check last login; if logged in after LWD → review activity logs and take corrective action. Reactivation: valid justification + prior approval + defined expiry date + usage log review.',l2:'Review and disable user IDs with >90 days inactivity monthly. If SSO: quarterly reconciliation for IDs inactive >90 days.',l3:'Scripts/Bot/IDM perform daily/weekly deactivation automatically. Reactivation via automated workflow, max 10-day period, activity logs reviewed by automated workflow. Systems <50 users exempt from script requirement.',kpi:'Leavers accessing solution after LWD without log review: L2 = 0 / L3 = 0 (ABSOLUTE ZERO TOLERANCE)',notes:'⚠ ABSOLUTE ZERO — any leaver with post-LWD access + no log review = critical audit finding. SSO applications require additional quarterly AD reconciliation. Reactivation only if LWD postponed or employment type changed.'},
+{code:'IT_ACCESS_09',name:'Access Revalidation for Employees Changing Functions (Movers)',domain:'IT ACCESS',key:false,freq:'Monthly',sop:false,scope:'Type 1,2 · OS · DB',what:'Access Revalidation for Employees Changing Functions (Movers). Manages risk of access accumulation when employees change roles — previous function access reviewed and revoked or revalidated. Max 6-month retention in transition.',l1:'No additional requirement (not a key control).',l2:'Monthly movers report generated → shared with old and new line manager for review, validation and approval. Access retained in transition: max 6 months with prior approval. Critical/High risk access of movers revalidated monthly. If all users read-only (e.g. marketing sites): quarterly frequency with Zone S&C alignment.',l3:'Mover access management automated via workflow tool or IDM.',kpi:'Movers with access not reviewed within 1 month: L2 ≤5% / L3 ≤1%',notes:'Movers exiting functions with Critical/High access: must be revoked immediately or formally revalidated. Access cannot exceed 6 months in transition without documented approval.'},
+{code:'IT_ACCESS_10-K',name:'Access Revalidation for 3rd Party Users',domain:'IT ACCESS',key:true,freq:'Monthly + Event-based',sop:false,scope:'Type 1,2,3,4 · OS · DB',what:'Access Revalidation for 3rd Party Users. Manages external vendor/supplier/partner access. All 3rd party access must be time-limited (max 90 days) and regularly revalidated. 3rd parties are a major external risk vector.',l1:'Monthly system report of all 3rd party accounts → review and validate by Control Owner. Validate and remediate before next control occurrence.',l2:'3rd party user validity set to maximum 90 days at time of granting. Where technically infeasible: SSO + AD restriction to 90 days (approved by Global IT Compliance).',l3:'Mandatory validity field (system blocks >90 days). Daily automated workflow identifies accounts expiring in 10 days → recertification request to Control Owner. No response → automatic revocation on Day 1 post-expiry + all active sessions terminated. Quarterly reconciliation vs. Saviynt.',kpi:'3rd party users with access >90 days without validation: L2 ≤2% / L3 =0%',notes:'If 3rd party terminates early: sponsor must update actual termination date in IDM immediately. For L3: Saviynt quarterly reconciliation mandatory. All 3rd party access tied to named ABI Sponsor.'},
+{code:'IT_ACCESS_11',name:'Access to Critical Business Shared Drives/Folders (Data Crown Jewels)',domain:'IT ACCESS',key:false,freq:'Annual',sop:false,scope:'Zone Level Control',what:'Access to Critical Business Shared Drives/Folders (Data Crown Jewels). Controls who has access to the most sensitive data repositories: consolidation platforms, accounting solutions, management reporting, external reporting, strategic documents.',l1:'No additional requirement (not a key control).',l2:'Maintain list of all data crown jewel folders with business owner details (reviewed and updated with Zone IC). Control owner periodically reviews users with access. Inappropriate access revoked within one month of review. Examples: SAP workspaces, Hyperion/BPC/HFM/Cognos workspaces, BI management reporting, penetration testing reports, strategic meeting minutes.',l3:'Access management automated via Scripts/Bot/workflow-based tool.',kpi:'No numeric KPI. Evidence: list of crown jewel storage drives approved by Internal Controls, access review evidence, access removal evidence (if any) within 1 month.',notes:'All Annual controls must execute before Q3. Data Crown Jewels identified per 10.2 Schedule 2 – IT Platform Classification of Global Information Security Policy (GISP).'},
+{code:'IT_ACCESS_12',name:'Access to Technical Interface / Application Folder',domain:'IT ACCESS',key:false,freq:'Annual',sop:false,scope:'Type 1 only',what:'Access to Technical Interface / Application Folder. Controls who has access to application shared folders and interface folders (identified per IT_INV_02 mapping). Inappropriate access revoked within one month of annual review.',l1:'No additional requirement (not a key control).',l2:'Control owner reviews access to all application shared folders/interface folders annually. Inappropriate access revoked within one month. Annual review must complete before Q3.',l3:'Automated via Script/BOT.',kpi:'Access to interface folder/app shared folders not revalidated: L2 ≤5% / L3 ≤1%',notes:'Annual review must complete before Q3 so gaps can be remediated by Q4. Applies only to Type 1 solutions (not applicable to DP-only, websites, VPN, etc.).'},
+{code:'IT_ACCESS_13',name:'Review of Rulesets for SoD and Sensitive Access Monitoring',domain:'IT ACCESS',key:false,freq:'Annual',sop:false,scope:'Type 1,2 · OS · DB',what:'Review of Rulesets for SoD and Sensitive Access Monitoring. Ensures ABI Global Ruleset and solution-level SoD rulesets are reviewed, updated and approved annually. Foundation control — IT_ACCESS_02 and 03 depend on this ruleset existing.',l1:'No additional requirement (not a key control).',l2:'ABI Global Ruleset reviewed and updated annually (approved by Global IC before Q1). Solution-level ruleset determined per Global Ruleset and reviewed before Q2 (approved by Zone IC). Covers: Critical, High, Medium, Low risk activities. Cannot be less stringent than Global Ruleset.',l3:'Workflow defined to evaluate customisations and include in ruleset on ongoing basis to ensure completeness and accuracy.',kpi:'Ruleset defined: Yes (compliant) / No (non-compliant) — binary KPI',notes:'NOT APPLICABLE if solution has no SoD or Sensitive Access. Global Ruleset approved before Q1; Solution ruleset before Q2.'},
+{code:'IT_BC_01-K',name:'Backup',domain:'BACKUP & BC',key:true,freq:'Annual + Event-based',sop:false,scope:'Type 1,2,3 · OS · DB',what:'Backup. Ensures a documented backup strategy exists, is reviewed annually, and backups execute as scheduled. Failed backups must be documented and resolved in a timely manner. In line with ABI Backup Policy.',l1:'Define backup strategy including frequency and schedule for IT solution in line with Backup Policy. Review annually by control owner. Execute backups per defined schedule. Document and resolve any failed backups.',l2:'.',l3:'.',kpi:'No numeric KPI defined. Evidence: backup strategy document, annual revalidation evidence, execution evidence, action taken for failed backups.',notes:'Adherence to ABI Backup Policy mandatory. All Annual controls must execute before Q3. Applies to application layer, database layer and OS layer.'},
+{code:'IT_BC_02',name:'Restore Testing',domain:'BACKUP & BC',key:false,freq:'Annual (as per BIA)',sop:false,scope:'Type 1,2,3',what:'Restore Testing. Validates that backups are actually recoverable and that RPO (Recovery Point Objective) and RTO (Recovery Time Objective) targets defined in the BIA are achievable. Required for Critical Financial/SOX/BIA High systems.',l1:'No additional requirement (not a key control).',l2:'Perform/revalidate BIA for the solution to determine RPO & RTO requirements and frequency of restoration testing. Execute restoration testing. Document and investigate any failures. Resolution in timely manner.',l3:'.',kpi:'BIA available in App360: Yes (compliant) / No (non-compliant) — binary KPI',notes:'Restoration testing mandatory for Critical Financial, SOX and BIA High systems. Strategy defined based on BIA document. All Annual controls must execute before Q3.'},
+{code:'IT_BC_03',name:'Disaster Recovery and Business Continuity',domain:'BACKUP & BC',key:false,freq:'Annual + Event-based',sop:false,scope:'Type 1,2,3',what:'Disaster Recovery and Business Continuity. Ensures BIA is performed, DR Plan and IT Continuity Cookbook are created for High-risk solutions, and DR plans are tested annually. SaaS: validate in vendor SOC reports.',l1:'No additional requirement (not a key control).',l2:'Perform BIA to identify High-risk solutions (MBCO, RTO, RPO). For High-risk solutions: create IT Continuity Plan, DR Plan and Cookbook. Review and test IT Continuity Plan, DR Plan and Cookbook annually. For SaaS: review & validate business continuity in SOC reports received from vendor.',l3:'.',kpi:'No numeric KPI defined. Evidence: IT Continuity Plan, DR Plan & Cookbook; BIA document; DR test evidence recorded per BCP Policy.',notes:'Every DR test must be recorded and evidence retained per BCP Policy. All Annual controls must execute before Q3. SaaS applications: business continuity controls reviewed in vendor SOC reports.'},
+{code:'IT_IF_01-K',name:'Monitoring of Jobs and Interfaces',domain:'INTERFACE',key:true,freq:'Event-based (continuous)',sop:false,scope:'Type 1,2,7 · OS · DB',what:'Monitoring of Jobs and Interfaces. Critical batch jobs and data interfaces must be continuously monitored. Failures remediated in a timely manner. Repeated failures require Root Cause Analysis. SOX systems: zero unmonitored critical jobs/interfaces.',l1:'Maintain list of batch jobs and interfaces categorised by criticality. Monitor critical jobs/interfaces continuously (alert-based or manual report review). Failures remediated via incident management. RCA for repeated failures. Critical batch jobs run via system user ID only.',l2:'All interfaces ensure automated completeness between source and target. All interfaces encrypted (data in transit). After restart, interfaces auto-restore consistency between source and target.',l3:'.',kpi:'Critical jobs/interfaces without monitoring: SOX =0% / Non-SOX ≤5% | L3 =0%\nCritical jobs/interfaces with unremediated failures: SOX =0% / Non-SOX ≤5% | L3 =0%',notes:'Monitoring can be alert-based or manual system reports. If jobs/interfaces not classified by criticality: apply control to ALL. Interfaces must use encrypted protocols (no FTP, Telnet). Completeness between source and target must be restorable after restart.'},
+{code:'IT_NW_01',name:'Network Segmentation',domain:'NETWORK',key:false,freq:'Annual',sop:false,scope:'Type 1,2',what:'Network Segmentation. Strict network segmentation required for: e-commerce systems, brewery/supply vs. corporate/office networks, guest vs. internal networks, treasury/payment systems, and solutions with known critical vulnerabilities that cannot be remediated.',l1:'No additional requirement (not a key control).',l2:'Implement and maintain strict network segmentation for all defined critical systems. Document in network diagram clearly showing segmentation for each category.',l3:'.',kpi:'No numeric KPI defined. Evidence: network diagram clearly showing segmentation for critical systems categories.',notes:'Solutions with known critical vulnerabilities where remediation is infeasible must be network-isolated. Applies to brewery supply vs. corporate network — critical for OT/IT boundary. All Annual controls must execute before Q3.'},
+{code:'IT_CHNG_01-K',name:'Change Management',domain:'CHANGE',key:true,freq:'Event-based + Monthly',sop:false,scope:'Type 1,2,3,4,5,7 · OS · DB',what:'Change Management. All changes to IT solutions implemented per ABI change management policy. Formal documentation and approvals required. No direct production changes — changes made in dev and moved to prod after testing. Monthly log review.',l1:'All changes implemented per ABI change management policy. Normal changes: all documentation/approvals before moving to production. Emergency changes: documentation/approvals within 1 week of production move. No direct production changes. Developers must not have write access to production. Monthly review of change logs by control owner.',l2:'Monthly change log review for adherence. Where production client opened: secure configuration restored after change.',l3:'Code logged in VCS linked to change requirements. Merged to master only after automated testing (Code Quality, Security, Unit, Component). Code movement to subsequent environments via automated tools only (Azure Pipelines, Jenkins, GitHub Actions). Access restrictions so developers cannot access conflicting production business functions.',kpi:'Changes moved to Prod without tickets: L2 =0% / L3 =0%',notes:'Developers should not have write access to production. If granted: all dev production activities must be reviewed for appropriateness. Emergency changes: maximum 1 week for documentation post-change.'},
+{code:'IT_CHNG_02',name:'Code Review',domain:'CHANGE',key:false,freq:'Event-based',sop:false,scope:'Type 1,2,3 · DB',what:'Code Review. Secure code review performed and documented before deploying any code to production. Critical/High risk issues must be remediated before deployment. Uses approved code review tools.',l1:'No additional requirement (not a key control).',l2:'Secure code review performed and documented prior to production deployment. Code review via approved tool. Critical/High risk issues remediated before deployment. Approved tools: Synopsys, Checkmarx, VeraCode, Onapsis, LayerSeven, Snyk. If coding language not supported: follow NIST/OWASP guidelines via independent developer manual review.',l3:'.',kpi:'Critical/High unremediated issues: L2 =0 / L3 =0',notes:'Applicable only where ABI (or engaged 3rd party developers) has option to perform code development. If vendor-managed SaaS with no code access: may be marked Not Applicable.'},
+{code:'IT_CHNG_03',name:'Incident & Problem Management',domain:'CHANGE',key:false,freq:'Event-based',sop:false,scope:'Type 1,2,4 · OS · DB',what:'Incident & Problem Management. Structured tracking of IT incidents (individual events) and Problems (root cause of recurring incidents). Ticketing tool with full audit trail mandatory. Problem Management requires trend analysis and action plans.',l1:'No additional requirement (not a key control).',l2:'All IT incidents logged, tracked and resolved in ticketing tool with audit trail. Tool captures: all associated configuration items, outstanding incidents, known and suspected errors. Problem Management: recurring incidents tracked, trends identified, action plans created to prevent or minimise future occurrences.',l3:'.',kpi:'No numeric KPI threshold. Evidence: ticketing tool export with open/in-progress/closed incidents and timestamps; problem tracking with action plans and owners.',notes:'Key distinction: Incident = individual event; Problem = root cause of recurring incidents. Evidence for audit: timestamp trail in ticketing tool. Problem Management evidence: trend analysis documents with corrective action plans.'},
+{code:'IT_CHNG_04',name:'Project Management – Controls Assessment',domain:'CHANGE',key:false,freq:'Event-based',sop:false,scope:'Zone Level Control',what:'Project Management – Controls Assessment. New IT solutions assessed for MICS compliance before go-live. Only compliant projects go live. Business MICS controls impacted by new/changed solution must be identified and adjusted.',l1:'No additional requirement (not a key control).',l2:'Assess new projects for IT MICS compliance before go-live (per IT_INV_01). Only projects that pass all required MICS controls go live. Assess which business MICS controls are impacted by solution changes. Zone IC approval required for control design adjustments.',l3:'Workflow tool captures MICS compliance assessment at each project stage with approvals by Zone IC.',kpi:'Solutions in production without MICS assessment: L2 =0%',notes:'Projects cannot go-live if required MICS controls not implemented. Zone Solutions team tracks MICS status during implementation. First MICS assessment happens in quarter of identification.'},
+{code:'IT_CHNG_05-K',name:'Project Management – Project Methodology',domain:'CHANGE',key:true,freq:'Event-based',sop:false,scope:'Zone Level Control',what:'Project Management – Project Methodology. Standard project management methodology (Waterfall, Agile/DevOps) followed for projects with CapEx >$200K. Data migration checks required. Formal handover to operations.',l1:'Follow standard project management methodology (Waterfall or Agile). For Waterfall: definition, scope, business & technical requirements documented, project plan, UAT performed, formal P2BAU handover. For Agile: VCS in place, code linked to change requirements, Pull Request approvals, automated test cases, pipeline configuration. If data migration involved: completeness and accuracy checks documented.',l2:'.',l3:'No additional requirement.',kpi:'No numeric KPI defined. Evidence: project list, methodology evidence, data migration checks and business owner approvals.',notes:'Scope limited to projects with CapEx spend >$200K. For DevOps projects: refer to IT_CHNG_01-K DevOps guidelines. P2BAU = Point to Business As Usual (moment system used for first time in production to support a business process).'},
+{code:'IT_CHNG_06-K',name:'Direct Changes to SAP Production (SOX Systems Only)',domain:'CHANGE',key:true,freq:'Annual + Weekly + Event-based',sop:false,scope:'Type 1 (SOX systems only)',what:'Direct Changes to SAP Production (SOX Systems Only). SAP system configured to prevent direct production changes. Production client locked (T000 settings). Access via FFID only for exceptions. Weekly review of generic SAP accounts. Log review within 10 working days.',l1:'SAP system configured to prevent direct production changes (T000 parameters: Changes & Transport=2, No Cross-Client Maintenance=3, Copy Protection=L). Access for direct changes: restricted, exceptional cases only via FFID. Weekly review of generic SAP accounts (SAP*, DDIC, TMSADM, SAPOSS, EARLYWATCH): confirm available, default passwords changed, in SUPER group, locked when not in event. Logs reviewed within 10 working days of usage.',l2:'. L3 (Same as L2).',l3:'',kpi:'Client opening without approval: L2 =0% / L3 =0%\nUsage logs not reviewed within 10 working days: L2 ≤1% / L3 =0%',notes:'EFFECTIVE 1ST JUL 2025. Usage logs maintained outside SAP (SIEM) for minimum 18 months. T000 annual review must confirm parameters. Scope: SOX systems only. Discrepancies reported to ABI Ethics/Global Security & Compliance.'},
+{code:'IT_SEC_01-K',name:'Password Settings',domain:'SECURITY',key:true,freq:'Annual + Event-based',sop:false,scope:'Type 1,2,3,4,5 · OS · DB',what:'Password Settings. Password settings for all user types (end-users, admin, system accounts) configured per ABI Security Policy (ABI_IS_POLICY_STD_2). Default passwords changed. SSO preferred. No exceptions unless technically infeasible.',l1:'Password settings configured per ABI security policy for all account types (end-users, admins, system accounts) to extent technically feasible. Exceptions approved by Zone S&C Director.',l2:'Default passwords for sensitive accounts changed immediately. No exceptions allowed. Where technical feasibility issue: SSO implemented to cover the risk.',l3:'IT Solution uses SSO login. Active Directory password settings configured per ABI security policy.',kpi:'No numeric KPI. Evidence: password settings screenshots, justification for any technical limitation, list of sensitive accounts with changed defaults.',notes:'Refer ABI_IS_POLICY_STD_2 for Password guidelines. All Annual controls must execute before Q3. SSO is the preferred authentication mechanism. No exceptions without Zone S&C Director approval.'},
+{code:'IT_SEC_02',name:'Authentication Mechanisms for Administrative and/or Remote Access',domain:'SECURITY',key:false,freq:'Annual',sop:false,scope:'Type 1,2,3 | Zone Level (MFA for all users)',what:'Authentication Mechanisms for Administrative and/or Remote Access. MFA (Multi-Factor Authentication) mandatory for remote access into corporate network (Zone level) and for solutions with Critical IT/Business risks and vault platforms (Solution level). Max 0.5% non-enrolled users.',l1:'No additional requirement (not a key control).',l2:'-B (Annual – Solution Level): MFA configured for access to all IT solutions with Critical IT/Business risks and vault platforms containing privileged accounts. If technically infeasible: approval from Global Director AppSec required and documented.',l3:'.',kpi:'Users not enforced on MFA (Zone): ≤0.5% [rolling 30-day average, excluding users created in last 7 days]\nIT solutions on-boarded on MFA: Yes/No — binary KPI',notes:'Approved vault platforms: SAP GRC EAM, BeyondTrust, PIM. IT_SEC_02 assessed at BOTH Zone level (MFA for all users) and Solution level (MFA for vault and critical risk solutions). All Annual controls must execute before Q3.'},
+{code:'IT_SEC_03',name:'Anti-Virus & Malware',domain:'SECURITY',key:false,freq:'Monthly + Weekly (L3)',sop:false,scope:'Zone Level Control',what:'Anti-Virus & Malware. All IT devices (Laptops, Desktops, Servers, Thin Clients, IaaS devices within ABI network perimeter including Azure, AWS, GCP) must have active, up-to-date anti-virus and anti-malware software installed.',l1:'No additional requirement (not a key control).',l2:'Control owner reviews central report of anti-virus/anti-malware status on all devices. Security incident raised for any device without updated AV or agent not communicating to central console. Incidents resolved by subsequent month or control is ineffective.',l3:'Centralised solution monitors AV/anti-malware deployment status and sends automated alerts to Security Operations team for issues.',kpi:'Devices without updated AV/anti-malware >1 month: Servers L2 =0% / L3 =0% | Workstations L2 ≤5% / L3 =0%',notes:'Deviations: AV not installed OR agent not communicating to central console. If same deviation identified in subsequent month = control is ineffective. Devices include all IaaS in ABI Azure/AWS/GCP subscriptions.'},
+{code:'IT_SEC_05',name:'Hardening',domain:'SECURITY',key:false,freq:'Annual + Event-based',sop:false,scope:'Type 1,2,3,4 · OS · DB',what:'Hardening. IT solutions hardened per ABI recommended standards (CIS benchmark, DISA STIG, NIST, SAP security framework) or vendor guidelines. Covers OS, Application, Network, Database, Endpoint, Cloud, Web Server, IAM, Logging & Monitoring.',l1:'No additional requirement (not a key control).',l2:'IT solution hardened per ABI/vendor standards. Hardening document maintained and reviewed annually. IT solutions scanned periodically for secure configuration. Highest criticality gaps remediated. All interfaces use encryption and mutual authentication. No unsecure protocols (FTP, Telnet, HTTP for credentials). Firewall hardening: only necessary ports, each rule approved, default-deny rule implemented.',l3:'Secure configuration maintained via configuration management tool (e.g. Puppet).',kpi:'Hardening non-compliance as per ABI guidelines: L2 ≤5% / L3 ≤1%\n(Measured as: repeated vulnerabilities / total vulnerabilities AND high/critical vulnerabilities not remediated per SOC guidelines)',notes:'Hardening policy must be aligned with Global Security Architecture team. Exceptions approved by Global VP Solutions Security & Tech Ops. All Annual controls must execute before Q3. APIs: use standard authentication (JWT, OAuth), API gateway, max retry/jail, encryption, HTTPS.'},
+{code:'IT_SEC_06',name:'Physical Security',domain:'SECURITY',key:false,freq:'Annual',sop:false,scope:'Type 1,2,3',what:'Physical Security. Periodic inspection of physical access and environmental security controls for all in-scope datacenter facilities. For 3rd party datacenters: annual review of independent assurance report (SOC I/II).',l1:'No additional requirement (not a key control).',l2:'For ABI-operated datacenters: periodic inspection of physical access and environmental security controls. Action plan for any issues found. For 3rd party datacenters: review SOC I/II report, verify physical security and environmental controls. Action plan for issues.',l3:'.',kpi:'No numeric KPI. Evidence: physical/environmental security controls inspection evidence; SOC I/II report (valid for audit period); action plans for issues.',notes:'All Annual controls must execute before Q3. For cloud/SaaS: physical security validated through vendor SOC reports.'},
+{code:'IT_SEC_07',name:'Data Retention Management',domain:'SECURITY',key:false,freq:'Annual + Event-based',sop:false,scope:'Type 1,2,3',what:'Data Retention Management. For IT solutions containing personal data: data retention requirements defined and aligned with zone ethics/compliance team per local regulatory requirements. Archiving/deletion executed per defined frequency.',l1:'No additional requirement (not a key control).',l2:'For each IT solution containing personal data: define retention requirements and align with zone ethics and compliance team (local regulatory requirements vary by country). Execute archiving and/or data deletion per defined frequency annually.',l3:'.',kpi:'PIA available with Retention Period defined (if applicable): Yes (compliant) / No (non-compliant) — binary KPI',notes:'Data retention requirements vary by country for personal and sensitive personal data. Refer to GLOBAL DATA RETENTION & LEGAL HOLD POLICY. Applies to all DP-relevant solutions.'},
+{code:'IT_SEC_08',name:'Vulnerability Scanning & Patch Management',domain:'SECURITY',key:false,freq:'Monthly + Event-based',sop:false,scope:'Type 1,2,3,4 · OS · DB',what:'Vulnerability Scanning & Patch Management. Regular vulnerability scanning of IT solutions. Gaps tracked to resolution. Critical/High vulnerabilities remediated per SOC guidelines. Essential patches implemented within 30 days. End-of-Life systems treated as vulnerabilities.',l1:'No additional requirement (not a key control).',l2:'Vulnerability scanning per SOC guidelines. All gaps have documented plan & target remediation date. Highest criticality gaps remediated per SOC timelines. Essential patches (security, stability, legal/regulatory) implemented in a timely manner (recommended: 30 days for critical). Exceptions approved by Global Director AppSec. End-of-Life/no-support systems = vulnerability requiring action.',l3:'IT solution maintains version no older than n-2 (where n = most recent available version). Automated tool monitors version and pushes patch upgrades.',kpi:'Critical/High unremediated vulnerabilities (overdue): L2 =0 / L3 not defined\nCritical patches not implemented within 30 days: L2 =0 / L3 not defined',notes:'Essential patches = non-negotiable: security vulnerabilities, system stability, legal/regulatory requirements. Vendor-unsupported systems = vulnerability. New upgrades identified via monitoring process. Refer to SOC Guidelines on Vulnerability Scanning.'},
+{code:'IT_SEC_09',name:'Penetration Testing',domain:'SECURITY',key:false,freq:'As per AppSec Policy',sop:false,scope:'Type 1,2,3,4',what:'Penetration Testing. Penetration testing performed per ABI Application Security Policy timeline. Critical/High gaps tracked to resolution and remediated. Control fails if highest criticality gaps not remediated per AppSec Policy.',l1:'No additional requirement (not a key control).',l2:'Penetration testing performed per schedule. All gaps have documented target remediation date. Critical/High gaps remediated before deadline per AppSec Policy. Track and resolve all identified vulnerabilities.',l3:'.',kpi:'Pentest issues not remediated on time (Critical/High): L2 =0 / L3 =0',notes:'Link to ABI Application Security Policy for frequency requirements. Gaps identified must have a target remediation date. Control fails if highest criticality gaps not remediated per AppSec Policy timelines.'},
+{code:'IT_SEC_10',name:'Social Media Accounts Security',domain:'SECURITY',key:false,freq:'Half-yearly + Event-based',sop:false,scope:'Zone Level Control',what:'Social Media Accounts Security. Access to official ABI social media accounts reviewed half-yearly. MFA enabled where technically feasible. Credentials managed via credential management platforms. Login notifications enabled.',l1:'No additional requirement (not a key control).',l2:'Maintain list of all official social media accounts. Control owner reviews access half-yearly and revokes unauthorised access. Access to social media platforms enabled via credential management platforms. MFA configured where technically feasible (approved by Zone Solutions Director). Login/email notification enabled.',l3:'.',kpi:'No numeric KPI. Evidence: user access list, half-yearly review evidence, access removal evidence (if any), emergency user account owner list, MFA configuration evidence.',notes:'Social media apps must not have access to Strictly Confidential/Confidential/Internal Use Only data per policy. Emergency user account owners defined for each platform. Refer to ABI Asset Management Policy 3.2 for information classification.'},
+{code:'IT_INV_01',name:'IT Solutions Inventory',domain:'INVENTORY',key:false,freq:'Event-based + Quarterly',sop:false,scope:'Zone Level Control',what:'IT Solutions Inventory. All live IT solutions classified as critical maintained in App360 with complete attributes. Quarterly review by Portfolio Managers and all Risk Owners. Foundation for all MICS controls — scope is determined here.',l1:'No additional requirement (not a key control).',l2:'Maintain inventory in App360 with: unique name, description, IT owner, business owner, solution type, all 6 risk classifications (SOX, BIA, DP, Crown Jewel, External Facing, ESG) with formal sign-offs. Include PowerApps where output is input to a SOX control. Include SOX-relevant BI solutions. Quarterly review by Portfolio Managers and all Risk Owners in App360. Solutions identified in quarterly review enter MICS scope no later than one quarter after identification (first assessment in quarter of identification).',l3:'.',kpi:'Key information missing in inventory master data: L2 ≤1% / L3 =0%\nSolutions without Risk Owner review: L2 ≤5% / L3 =0%',notes:'Disqualifier: IT solutions in production but NOT in inventory = immediate finding. Risk classification sign-offs: SOX by IC+External Auditors, BIA by Zone ManCom, DP by Zone Legal, Crown Jewel by Zone IC, External by IT Security Lead/SOC, ESG by Zone IC/ESG Controller.'},
+{code:'IT_INV_02',name:'Mapping All IT Components of the Application',domain:'INVENTORY',key:false,freq:'Annual + Quarterly',sop:false,scope:'Type 1,2',what:'Mapping All IT Components of the Application. Technical map prepared and reviewed annually per environment (dev, test, prod). Covers: all hosts and functions, databases, interfaces & integrations, network architecture, end-user access points. Quarterly maintenance of component lists.',l1:'No additional requirement (not a key control).',l2:'Prepare technical map per environment containing: all hosts and functions (load balancers, app servers, DB servers), all databases + storage components, all interfaces & integrations (internal and external), network architecture (subnets, segments, firewall, VPN gateways), end-user access points. Quarterly maintenance of: shared folders/drives list, AD groups for front-end/back-end access, ACL lists, support partners RACI, Servers & Databases (incl. VMs, Resource Groups, Subscriptions), connected tools (Change Mgmt, scheduling, code repository), critical upstream/downstream dependencies.',l3:'.',kpi:'No numeric KPI. Evidence: technical map/diagram, periodic review evidence, changes documented with version control.',notes:'Applies to ALL IT solutions including SaaS, IaaS, PaaS. All Annual reviews by Application Owner must complete before Q3. This control feeds IT_ACCESS_12 (interface folder access).'},
+{code:'IT_LICENSE_01',name:'Software Asset & License Management',domain:'LICENSE',key:false,freq:'Annual',sop:false,scope:'Zone Level Control',what:'Software Asset & License Management. Software Asset Management (SAM) tool with agents deployed across all hosts to track deployment vs. license entitlements for at least the top 8 publishers. Deviations resolved to minimise over/under exposure.',l1:'No additional requirement (not a key control).',l2:'SAM tool with agents deployed across all hosts recording deployment and license details (in use vs. procured). Analyse license posture per publisher (covering at least top 8). When deviations identified: take timely action to resolve and minimise over/under exposure.',l3:'.',kpi:'No numeric KPI. Evidence: SAM tool review evidence for vendor license management; action log for resolving deviations.',notes:'All Annual controls must execute before Q3. SAM tool must have agents on all hosts. Top 8 publishers minimum coverage.'},
+{code:'IT_ISAE_01-K',name:'ISAE / Contract Review',domain:'ASSURANCE',key:true,freq:'Annual',sop:false,scope:'Type 1,2,3,4,5 · OS · DB',what:'ISAE / Contract Review. Annual review of 3rd party service provider ISAE 3402 (SOC) reports or contracts to ensure all IT MICS control risks are addressed by the vendor. For SOX systems: SOC 1 Type 2 reports mandatory.',l1:'Review ISAE 3402 report or contract from 3rd party service provider annually to ensure risks per ABI IT MICS guidelines are addressed. Action plans defined and tracked for any issues reported.',l2:'. L3 (Same as L2).',l3:'',kpi:'No numeric KPI. Evidence: ISAE 3402/SOC I/II report or contract (valid for audit period), annual review evidence, action plan tracking for issues.',notes:'Control marked \'Relying on Contract/ISAE 3402\' ONLY if relevant controls explicitly covered in contract/report. For SOX solutions: SOC 1 Type 2 mandatory. Issues → action plan tracked to closure. Refer to Third Party Compliance Guidelines.'},
+{code:'IT_AUTO_01',name:'Inventory of Robots Used for Process Automation (RPA)',domain:'RPA',key:false,freq:'Event-based + Quarterly',sop:false,scope:'Zone Level Control',what:'Inventory of Robots Used for Process Automation (RPA). All production RPA bots inventoried in Zone BOT Inventory. New bots reviewed and approved by Zone Internal Controls before moving to production. Inventory reviewed quarterly for completeness.',l1:'No additional requirement (not a key control).',l2:'For any new BOT: update Zone BOT Inventory with all required details per Global RPA Policy (unique ID, technical platform, description of activities, applications touched, controls checklist, criticality for financial reporting, stage). BOT moved to production ONLY after Zone IC review and approval. Quarterly review of Zone BOT Inventory for completeness.',l3:'Workflow used in Zone BOT Inventory to track development stages with approvals captured at each stage by Zone IC.',kpi:'Critical information missing in BOT master data: L2 ≤5% / L3 ≤2%',notes:'A BOT is financial-critical if: execution impacts Balance Sheet/P&L, executes SoD/Sensitive Activities Ruleset activities, or influences a key MICS control. Refer to ABI_GIS_POLICY_ANX_10 (BOT Policy).'},
+{code:'IT_AUTO_02',name:'Business Monitoring of Robots',domain:'RPA',key:false,freq:'Monthly + Event-based',sop:false,scope:'Zone Level Control',what:'Business Monitoring of Robots. Financial-critical BOTs reviewed periodically for abnormalities. Monitoring covers: BOT crashes, duplicate execution over same dataset, abnormal behaviour due to changed process or abnormal input, credential misuse.',l1:'No additional requirement (not a key control).',l2:'Critical BOTs reviewed periodically to ensure no discrepancies/abnormalities in functioning. Review performed independently (not through BOT\'s own report) via predefined script. Sanity check or reconciliation via independent control BOT.',l3:'Critical BOTs continuously monitored via automated solution (MRT, DB Logger, etc.) providing alerts to control owner for any discrepancies/abnormalities.',kpi:'No numeric KPI. Evidence: list of critical BOTs, BOT monitoring evidence, actions taken for issues/failures.',notes:'Review must be independent — do NOT use the report generated by the BOT under review. Sanity check examples: back-of-envelope calculation, BOT-generated data reconciliation via independent control BOT. All 5 BOT failure scenarios must be covered.'},
+{code:'IT_AI_01',name:'AI Solutions Oversight & Compliance Control (NEW IN 2026)',domain:'AI',key:false,freq:'Event-based + Quarterly + Ongoing',sop:false,scope:'Type 1 (AI solutions)',what:'AI Solutions Oversight & Compliance Control (NEW IN 2026). All AI-related applications and tools recorded in App360 before deployment. Quarterly review by Portfolio Managers and Risk Owners. Controls implemented per AI Governance Policy. Covers standalone AI apps, AI utilities/scripts, 3rd party AI SaaS, custom AI, embedded AI modules.',l1:'No additional requirement (not a key control).',l2:'Record ALL AI applications/tools in App360 before deployment or use. Quarterly review by Performance Manager and Risk Owners. Implement controls per AI Governance Policy: (1) all AI accounts unique with human oversight; (2) AI activity monitoring jobs configured, output validation for financial AI, logs retained for audit; (3) robust output validation before production; (4) code review per secure AI coding standards, issues resolved before production; (5) change management process preventing single individual from deploying to production without secondary validation; (6) AI incidents managed per ABI Security Policy with AI-specific considerations — critical AI incidents require immediate escalation.',l3:'.',kpi:'No numeric KPI in current draft. Evidence: AI Inventory in App360, review evidence by Service Owner/Risk Owners/Portfolio Managers, control monitoring evidence per AI checkpoint guidelines.',notes:'⚠ NEW CONTROL IN IT MICS 2026. Scope: standalone AI apps, AI utilities/ML scripts, 3rd party AI SaaS tools, custom-developed AI, embedded AI modules that can be independently accessed or configured. Refer to ABI AI Playbook for development lifecycle best practices.'},
+];
+function GuideFreqBadge({freq}){return <span className={'inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold border '+(GUIDE_FREQ_COLORS[freq]||'text-neutral-400 bg-neutral-500/10 border-neutral-500/30')}>{freq}</span>}
+function GuideKeyBadge(){return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-red-400 bg-red-500/10 border border-red-500/30"><KeyRound className="w-3 h-3"/>KEY</span>}
+function GuideSopBadge(){return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold text-yellow-400 bg-yellow-500/10 border border-yellow-500/30"><FileCheck2 className="w-3 h-3"/>SOP</span>}
+
+function GuideDetailView({ctrl,onBack}){
+  const Section=({icon:Ic,title,children})=>(
+    <div className="bg-neutral-900 border border-neutral-800 rounded-xl p-5 mb-4">
+      <div className="flex items-center gap-2 mb-3"><Ic className="w-4 h-4 text-yellow-500"/><h3 className="text-[11px] font-bold tracking-widest text-yellow-500 uppercase">{title}</h3></div>
+      {children}
+    </div>
+  );
+  return (
+    <div className="max-w-4xl mx-auto">
+      <button onClick={onBack} className="flex items-center gap-2 text-neutral-400 hover:text-white text-sm mb-6 transition-colors"><ArrowLeft className="w-4 h-4"/>Back to guide</button>
+      <div className="flex flex-wrap items-center gap-3 mb-1">
+        <h2 className="text-2xl sm:text-3xl font-black text-white">{ctrl.code}</h2>
+        {ctrl.key&&<GuideKeyBadge/>}<GuideFreqBadge freq={ctrl.freq}/>{ctrl.sop&&<GuideSopBadge/>}
+      </div>
+      <p className="text-lg text-neutral-300 mb-8">{ctrl.name}</p>
+      <Section icon={Target} title="What it controls"><p className="text-sm text-neutral-300 leading-relaxed">{ctrl.what}</p></Section>
+      <div className="grid sm:grid-cols-2 gap-4 mb-4">
+        <Section icon={ShieldCheck} title="Scope"><p className="text-sm text-neutral-300">{ctrl.scope}</p></Section>
+        <Section icon={CalendarClock} title="KPI & Threshold"><p className="text-sm text-neutral-300">{ctrl.kpi}</p></Section>
+      </div>
+      <Section icon={ListChecks} title="How to execute — by maturity level">
+        {[['L1',ctrl.l1],['L2',ctrl.l2],['L3',ctrl.l3]].map(([lvl,txt])=>(
+          <div key={lvl} className="flex gap-3 mb-3">
+            <span className="shrink-0 w-8 h-8 rounded-lg bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 text-xs font-black flex items-center justify-center">{lvl}</span>
+            <p className="text-sm text-neutral-300 leading-relaxed pt-1.5">{txt}</p>
+          </div>
+        ))}
+      </Section>
+      <Section icon={AlertTriangle} title="Critical notes"><p className="text-sm text-neutral-300 leading-relaxed">{ctrl.notes}</p></Section>
+    </div>
+  );
+}
+
+function GuideGridView({onOpen}){
+  const[search,setSearch]=useState('');
+  const[domain,setDomain]=useState('ALL');
+  const filtered=useMemo(()=>{const q=search.trim().toLowerCase();return GUIDE_CONTROLS.filter(c=>(domain==='ALL'||c.domain===domain)&&(!q||c.code.toLowerCase().indexOf(q)!==-1||c.name.toLowerCase().indexOf(q)!==-1));},[search,domain]);
+  const grouped=useMemo(()=>{const g={};filtered.forEach(c=>{(g[c.domain]=g[c.domain]||[]).push(c)});return GUIDE_DOMAINS.filter(d=>g[d]).map(d=>[d,g[d]]);},[filtered]);
+  return (
+    <div className="max-w-5xl mx-auto">
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-6">
+        <div>
+          <h1 className="text-2xl sm:text-3xl font-bold text-white">Control <span className="text-yellow-500">Detail Guide</span></h1>
+          <p className="text-sm text-neutral-500 mt-1">{GUIDE_CONTROLS.length} MICS controls — click a card for full execution details</p>
+        </div>
+        <div className="relative">
+          <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2"/>
+          <input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search control..."
+            className="bg-neutral-900 border border-neutral-800 rounded-lg pl-9 pr-8 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500 w-64"/>
+          {search&&<button onClick={()=>setSearch('')} className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-white"><X className="w-4 h-4"/></button>}
+        </div>
+      </div>
+      <div className="flex flex-wrap gap-2 mb-8">
+        {['ALL'].concat(GUIDE_DOMAINS).map(d=>(
+          <button key={d} onClick={()=>setDomain(d)}
+            className={'text-xs font-bold px-3 py-1.5 rounded-full border transition-colors '+(domain===d?'bg-yellow-500 text-black border-yellow-500':'text-neutral-400 border-neutral-800 hover:border-neutral-600')}>
+            {d}
+          </button>
+        ))}
+      </div>
+      {grouped.length===0&&<p className="text-neutral-500 text-sm">No controls match your search.</p>}
+      {grouped.map(([dom,list])=>(
+        <div key={dom} className="mb-8">
+          <h2 className="text-[11px] font-bold tracking-widest text-neutral-500 uppercase mb-3">{dom}</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            {list.map(c=>(
+              <button key={c.code} onClick={()=>onOpen(c)}
+                className="text-left bg-neutral-900 border border-neutral-800 hover:border-yellow-500/60 rounded-xl p-4 transition-colors group">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="font-black text-white text-sm group-hover:text-yellow-500 transition-colors">{c.code}</span>
+                  {c.key&&<GuideKeyBadge/>}
+                </div>
+                <p className="text-sm text-neutral-400 mb-3 leading-snug">{c.name}</p>
+                <div className="flex items-center gap-2"><GuideFreqBadge freq={c.freq}/>{c.sop&&<GuideSopBadge/>}</div>
+              </button>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ───────────────────────── Main component ───────────────────────── */
+
+function MicsSuite() {
+  const ADMIN_USERNAME = 'admin';
+  const ADMIN_PASSWORD = 'MICS360';
+  const [isUnlocked, setIsUnlocked] = useState(false);
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginInput, setLoginInput] = useState('');
+  const [loginError, setLoginError] = useState('');
+  const [ready, setReady] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState('');
+
+  const [activeModule, setActiveModule] = useState(null);
+
+  const [periodsData, setPeriodsData] = useState({});
+  const [selectedPeriod, setSelectedPeriod] = useState(null);
+  const [monStatus, setMonStatus] = useState(null);
+  const [monLoading, setMonLoading] = useState(false);
+  const [columnAliases, setColumnAliases] = useState(DEFAULT_COLUMN_ALIASES);
+  const [showSettings, setShowSettings] = useState(false);
+  const [newColInput, setNewColInput] = useState({ aplicacao: '', status: '', mes: '', ano: '' });
+  const [detailStatusKey, setDetailStatusKey] = useState(null);
+  const monFileInputRef = useRef(null);
+
+  const [guideSelectedCtrl, setGuideSelectedCtrl] = useState(null);
+
+  const [farolRows, setFarolRows] = useState([]);
+  const [fileInfo, setFileInfo] = useState(null);
+  const [ctrlStatus, setCtrlStatus] = useState(null);
+  const [ctrlLoading, setCtrlLoading] = useState(false);
+  const [selectedApp, setSelectedApp] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [editingId, setEditingId] = useState(null);
+  const [editForm, setEditForm] = useState(null);
+  const [appsList, setAppsList] = useState(DEFAULT_ALLOWED_APPS);
+  const [farolLocked, setFarolLocked] = useState(false);
+  const [addingApp, setAddingApp] = useState(false);
+  const [newAppName, setNewAppName] = useState('');
+  const [editingApp, setEditingApp] = useState(null);
+  const [editAppName, setEditAppName] = useState('');
+  const [editAppSM, setEditAppSM] = useState('');
+  const ctrlFileInputRef = useRef(null);
+  const backupFileInputRef = useRef(null);
+  const [backupStatus, setBackupStatus] = useState(null);
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const result = await window.storageGet('mics2026-periods-shared');
+        if (mounted && result && result.value) {
+          const parsed = JSON.parse(result.value);
+          let needsMigration = false;
+          Object.keys(parsed).forEach(k => {
+            if (typeof parsed[k].locked === 'undefined') { parsed[k].locked = true; needsMigration = true; }
+          });
+          setPeriodsData(parsed);
+          const keys = Object.keys(parsed).sort();
+          let initialPeriod = keys.length ? keys[keys.length - 1] : null;
+          try {
+            const lastActive = await window.storageGet('mics2026-last-active-period');
+            if (lastActive && lastActive.value && parsed[lastActive.value]) initialPeriod = lastActive.value;
+          } catch (e) {}
+          if (initialPeriod) setSelectedPeriod(initialPeriod);
+          if (needsMigration) { try { await window.storageSet('mics2026-periods-shared', JSON.stringify(parsed)); } catch (e) {} }
+        }
+      } catch (e) {}
+      try {
+        const r2 = await window.storageGet('mics2026-col-aliases-shared');
+        if (mounted && r2 && r2.value) setColumnAliases(withColumnDefaults(JSON.parse(r2.value)));
+      } catch (e) {}
+      let loadedRows = [];
+      let loadedFileInfo = null;
+      let loadedLocked = false;
+      try {
+        const r4 = await window.storageGet('mics2026-farol-data');
+        if (mounted && r4 && r4.value) {
+          const parsed = JSON.parse(r4.value);
+          loadedRows = parsed.rows || [];
+          loadedFileInfo = { fileName: parsed.fileName, importedAt: parsed.importedAt };
+          if (typeof parsed.locked === 'undefined') {
+            loadedLocked = loadedRows.length > 0;
+          } else {
+            loadedLocked = !!parsed.locked;
+          }
+        }
+      } catch (e) {}
+      // Auto-merge seed rows for any of the 6 newly-added applications that don't yet
+      // have imported control data, so they appear populated without a manual re-import.
+      const appsWithData = new Set(loadedRows.map(r => r.application));
+      const missingSeedRows = NEW_APPS_SEED_ROWS.filter(r => !appsWithData.has(r.application));
+      if (missingSeedRows.length) {
+        loadedRows = loadedRows.concat(missingSeedRows);
+        if (!loadedFileInfo) loadedFileInfo = { fileName: 'MICS_Relevant_-_SA.xlsx (seed)', importedAt: new Date().toISOString() };
+        try { await window.storageSet('mics2026-farol-data', JSON.stringify({ rows: loadedRows, fileName: loadedFileInfo.fileName, importedAt: loadedFileInfo.importedAt, locked: loadedLocked })); } catch (e) {}
+      }
+      if (mounted) {
+        setFarolRows(loadedRows);
+        setFileInfo(loadedFileInfo);
+        setFarolLocked(loadedLocked);
+      }
+      try {
+        const r5 = await window.storageGet('mics2026-farol-apps-list');
+        if (mounted && r5 && r5.value) setAppsList(JSON.parse(r5.value));
+      } catch (e) {}
+      if (mounted) setReady(true);
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const persistPeriods = async (data) => { try { await window.storageSet('mics2026-periods-shared', JSON.stringify(data)); } catch (e) { console.error(e); } };
+  const persistColAliases = async (data) => { try { await window.storageSet('mics2026-col-aliases-shared', JSON.stringify(data)); } catch (e) { console.error(e); } };
+  const persistFarol = async (rows, info, locked) => { try { await window.storageSet('mics2026-farol-data', JSON.stringify({ rows, fileName: info.fileName, importedAt: info.importedAt, locked: !!locked })); } catch (e) { console.error(e); } };
+  const persistAppsList = async (list) => { try { await window.storageSet('mics2026-farol-apps-list', JSON.stringify(list)); } catch (e) { console.error(e); } };
+  const persistLastActivePeriod = async (key) => { try { await window.storageSet('mics2026-last-active-period', key || ''); } catch (e) { console.error(e); } };
+  const selectPeriod = (key) => { setSelectedPeriod(key); persistLastActivePeriod(key); };
+
+  const handleLogin = () => {
+    setLoginError('');
+    if (loginUsername.trim().toLowerCase() === ADMIN_USERNAME && loginInput === ADMIN_PASSWORD) {
+      setIsUnlocked(true); setLoginInput(''); setCurrentUserName('Admin');
+    } else {
+      setLoginError('Incorrect username or password.');
+    }
+  };
+  const handleLogout = () => { setIsUnlocked(false); setActiveModule(null); setCurrentUserName(''); setGuideSelectedCtrl(null); };
+
+  const addColAlias = async (field) => {
+    const val = newColInput[field].trim().toLowerCase();
+    if (!val) return;
+    const cur = columnAliases[field] || [];
+    if (cur.indexOf(val) !== -1) { setNewColInput(prev => Object.assign({}, prev, { [field]: '' })); return; }
+    const updated = Object.assign({}, columnAliases, { [field]: cur.concat([val]) });
+    setColumnAliases(updated); await persistColAliases(updated);
+    setNewColInput(prev => Object.assign({}, prev, { [field]: '' }));
+  };
+  const removeColAlias = async (field, alias) => {
+    const updated = Object.assign({}, columnAliases, { [field]: (columnAliases[field] || []).filter(a => a !== alias) });
+    setColumnAliases(updated); await persistColAliases(updated);
+  };
+  const detectColKey = (row, field, aliases) => {
+    const list = (aliases[field] || []).map(a => a.toLowerCase().trim());
+    return Object.keys(row).find(k => list.indexOf(k.toLowerCase().trim()) !== -1);
+  };
+  const parseOneMonFile = async (file, aliases) => {
+    const buffer = await file.arrayBuffer();
+    const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+    let sheetName = wb.SheetNames[0];
+    for (let i = 0; i < wb.SheetNames.length; i++) {
+      if (/task|dashboard|scorecard|controle|monitoring|pending/i.test(wb.SheetNames[i])) { sheetName = wb.SheetNames[i]; break; }
+    }
+    const sheet = wb.Sheets[sheetName];
+    const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+    if (!rawRows.length) return { error: 'The "' + file.name + '" sheet appears to be empty.' };
+    const rows = rawRows.map(r => { const c = {}; Object.keys(r).forEach(k => { c[String(k).trim()] = r[k]; }); return c; });
+    const appKey = detectColKey(rows[0], 'aplicacao', aliases);
+    const statusKey = detectColKey(rows[0], 'status', aliases);
+    const mesKey = detectColKey(rows[0], 'mes', aliases);
+    const anoKey = detectColKey(rows[0], 'ano', aliases);
+    if (!statusKey) return { error: "Couldn't find the Status column in \"" + file.name + '". Columns: ' + Object.keys(rows[0]).join(', ') };
+    const taskRows = rows.map(r => {
+      let rowPeriodKey = null;
+      if (mesKey && anoKey) {
+        const mVal = parseMonthValue(r[mesKey]); const yVal = parseYearValue(r[anoKey]);
+        if (mVal && yVal) rowPeriodKey = yVal + '-' + String(mVal).padStart(2, '0');
+      }
+      return { aplicacao: appKey && r[appKey] ? String(r[appKey]).trim() : 'General', statusRaw: r[statusKey], periodKey: rowPeriodKey, raw: r };
+    });
+    return { taskRows, count: taskRows.length };
+  };
+  const handleMonFiles = async (fileList) => {
+    if (!isUnlocked) return;
+    setMonLoading(true); setMonStatus(null);
+    try {
+      const aliases = withColumnDefaults(columnAliases);
+      const files = Array.from(fileList);
+      const errors = []; const importedByPeriod = {};
+      const now = new Date();
+      const fallbackPeriodKey = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+      for (const file of files) {
+        try {
+          const result = await parseOneMonFile(file, aliases);
+          if (result.error) { errors.push(result.error); }
+          else {
+            const filePeriodKey = extractPeriodFromFilename(file.name) || fallbackPeriodKey;
+            result.taskRows.forEach(row => {
+              const pKey = row.periodKey || filePeriodKey;
+              if (!importedByPeriod[pKey]) importedByPeriod[pKey] = { taskRows: [], names: {} };
+              importedByPeriod[pKey].taskRows.push(row);
+              importedByPeriod[pKey].names[file.name] = (importedByPeriod[pKey].names[file.name] || 0) + 1;
+            });
+          }
+        } catch (err) { console.error(err); errors.push('Could not read "' + file.name + '".'); }
+      }
+      const periodsTouched = Object.keys(importedByPeriod);
+      if (periodsTouched.length === 0) {
+        setMonStatus({ type: 'error', msg: errors.length ? errors.join(' | ') : 'No valid data found.' });
+        setMonLoading(false); return;
+      }
+      let updated = Object.assign({}, periodsData);
+      let totalNewTasks = 0; const blockedPeriods = [];
+      periodsTouched.forEach(pKey => {
+        const existing = updated[pKey];
+        if (existing && existing.locked) { blockedPeriods.push(formatPeriodLabel(pKey)); return; }
+        const newRows = importedByPeriod[pKey].taskRows;
+        const nameLabels = Object.keys(importedByPeriod[pKey].names).map(n => n + ' (' + importedByPeriod[pKey].names[n] + ' tasks)');
+        const combinedRawRows = existing && existing.rawRows ? existing.rawRows.concat(newRows) : newRows;
+        const combinedFiles = existing && existing.files ? existing.files.concat(nameLabels) : nameLabels;
+        updated[pKey] = { rawRows: combinedRawRows, files: combinedFiles, importedAt: new Date().toISOString(), locked: false };
+        totalNewTasks += newRows.length;
+      });
+      if (blockedPeriods.length === Object.keys(importedByPeriod).length) {
+        setMonStatus({ type: 'error', msg: 'The following month(s) are already locked: ' + blockedPeriods.join(', ') + '.' });
+        setMonLoading(false); return;
+      }
+      setPeriodsData(updated);
+      const sortedTouched = periodsTouched.filter(k => blockedPeriods.indexOf(formatPeriodLabel(k)) === -1).sort();
+      const newSelected = sortedTouched[sortedTouched.length - 1];
+      setSelectedPeriod(newSelected);
+      await persistPeriods(updated);
+      await persistLastActivePeriod(newSelected);
+      const periodLabels = sortedTouched.map(formatPeriodLabel).join(', ');
+      let msg = totalNewTasks + ' tasks imported for period(s): ' + periodLabels + '.';
+      if (blockedPeriods.length) msg += ' Blocked (already locked): ' + blockedPeriods.join(', ') + '.';
+      if (errors.length) msg += ' Warning: ' + errors.join(' | ');
+      setMonStatus({ type: errors.length ? 'error' : 'success', msg });
+    } catch (err) {
+      console.error(err);
+      setMonStatus({ type: 'error', msg: 'Unexpected error: ' + (err && err.message ? err.message : String(err)) });
+    } finally { setMonLoading(false); }
+  };
+  const onMonFileChange = (e) => { const fl = e.target.files; if (fl && fl.length) handleMonFiles(fl); e.target.value = ''; };
+  const deletePeriod = async (key) => {
+    if (!isUnlocked) return;
+    const updated = Object.assign({}, periodsData); delete updated[key];
+    setPeriodsData(updated); await persistPeriods(updated);
+    const keys = Object.keys(updated).sort();
+    setSelectedPeriod(keys.length ? keys[keys.length - 1] : null);
+  };
+  const toggleLockPeriod = async (key) => {
+    if (!isUnlocked) return;
+    const updated = Object.assign({}, periodsData);
+    if (!updated[key]) return;
+    updated[key] = Object.assign({}, updated[key], { locked: !updated[key].locked });
+    setPeriodsData(updated); await persistPeriods(updated);
+  };
+
+  const periodKeys = Object.keys(periodsData).sort();
+  const current = selectedPeriod && selectedPeriod !== '__ALL__' ? periodsData[selectedPeriod] : null;
+  const isOverview = selectedPeriod === '__ALL__';
+  let statusCounts = {}, statusKeysSorted = [], appBreakdown = {}, totalTasks = 0;
+  if (current && current.rawRows) {
+    current.rawRows.forEach(r => {
+      const key = normalizeKey(r.statusRaw); const label = displayLabel(r.statusRaw);
+      if (!statusCounts[key]) statusCounts[key] = { label, count: 0 };
+      statusCounts[key].count += 1;
+      const app = r.aplicacao || 'General';
+      if (!appBreakdown[app]) appBreakdown[app] = { total: 0 };
+      appBreakdown[app][key] = (appBreakdown[app][key] || 0) + 1;
+      appBreakdown[app].total += 1;
+      totalTasks += 1;
+    });
+    statusKeysSorted = Object.keys(statusCounts).sort((a, b) => statusCounts[b].count - statusCounts[a].count);
+  }
+  // Overview (all months combined) — used by the pie chart tab
+  let overviewStatusCounts = {}, overviewKeysSorted = [], overviewTotal = 0, overviewByMonth = {};
+  periodKeys.forEach(pk => {
+    const pd = periodsData[pk];
+    if (!pd || !pd.rawRows) return;
+    let monthTotal = 0;
+    pd.rawRows.forEach(r => {
+      const key = normalizeKey(r.statusRaw); const label = displayLabel(r.statusRaw);
+      if (!overviewStatusCounts[key]) overviewStatusCounts[key] = { label, count: 0 };
+      overviewStatusCounts[key].count += 1;
+      overviewTotal += 1;
+      if (!overviewByMonth[pk]) overviewByMonth[pk] = {};
+      overviewByMonth[pk][key] = (overviewByMonth[pk][key] || 0) + 1;
+      monthTotal += 1;
+    });
+    if (overviewByMonth[pk]) overviewByMonth[pk].total = monthTotal;
+  });
+  overviewKeysSorted = Object.keys(overviewStatusCounts).sort((a, b) => overviewStatusCounts[b].count - overviewStatusCounts[a].count);
+  const appNames = Object.keys(appBreakdown).sort();
+  let detailTasks = [], detailColumns = [];
+  if (current && current.rawRows && detailStatusKey) {
+    detailTasks = current.rawRows.filter(r => normalizeKey(r.statusRaw) === detailStatusKey);
+    const colSet = {};
+    detailTasks.forEach(t => { if (t.raw) Object.keys(t.raw).forEach(k => { colSet[k] = true; }); });
+    detailColumns = Object.keys(colSet);
+  }
+
+  const detectCtrlColKey = (row, field) => {
+    const list = CTRL_COLUMN_ALIASES[field];
+    return Object.keys(row).find(k => list.indexOf(k.toLowerCase().trim()) !== -1);
+  };
+  const handleCtrlFile = async (file) => {
+    if (!isUnlocked) return;
+    if (farolLocked) { setCtrlStatus({ type: 'error', msg: 'Data is locked as Master Data. Click "Unlock" before reimporting.' }); return; }
+    setCtrlLoading(true); setCtrlStatus(null);
+    try {
+      const buffer = await file.arrayBuffer();
+      const wb = XLSX.read(buffer, { type: 'array', cellDates: true });
+      let sheetName = wb.SheetNames.find(n => /control\s*applicability/i.test(n));
+      if (!sheetName) sheetName = wb.SheetNames.find(n => /applicability/i.test(n));
+      if (!sheetName) sheetName = wb.SheetNames[0];
+      const sheet = wb.Sheets[sheetName];
+      const { objects: rawRows, headerFound } = findHeaderRowAndBuildObjects(sheet);
+      if (!rawRows.length) { setCtrlStatus({ type: 'error', msg: 'The "' + sheetName + '" sheet appears to be empty.' }); setCtrlLoading(false); return; }
+      if (headerFound <= 0) { setCtrlStatus({ type: 'error', msg: 'Could not locate the expected header row in the "' + sheetName + '" sheet.' }); setCtrlLoading(false); return; }
+      const rows = rawRows.map(r => { const c = {}; Object.keys(r).forEach(k => { c[String(k).trim()] = r[k]; }); return c; });
+      const smKey = detectCtrlColKey(rows[0], 'serviceManager');
+      const appKey = detectCtrlColKey(rows[0], 'application');
+      const ctrlKey = detectCtrlColKey(rows[0], 'control');
+      const applKey = detectCtrlColKey(rows[0], 'applicable');
+      const perfKey = detectCtrlColKey(rows[0], 'performedBy');
+      const statusKey = detectCtrlColKey(rows[0], 'status');
+      const selfAssessKey = detectCtrlColKey(rows[0], 'selfAssessment');
+      if (!appKey) { setCtrlStatus({ type: 'error', msg: "Couldn't find the Application column. Columns: " + Object.keys(rows[0]).join(', ') }); setCtrlLoading(false); return; }
+      const allowedSet = {};
+      appsList.forEach(a => { allowedSet[normalizeAppName(a)] = a; });
+      // Derive Applicable from "Self Assessment" when there is no explicit Applicable column
+      // (e.g. "MICS Relevant - SA" exports): any Self Assessment value other than
+      // "Not Applicable" counts as applicable.
+      const deriveApplicable = (r) => {
+        if (applKey) return String(r[applKey]).trim();
+        if (selfAssessKey) {
+          const sa = String(r[selfAssessKey] || '').trim().toLowerCase();
+          return sa && sa !== 'not applicable' ? 'Yes' : 'No';
+        }
+        return '';
+      };
+      const deriveStatus = (r) => {
+        if (statusKey && r[statusKey]) return String(r[statusKey]).trim();
+        if (selfAssessKey && r[selfAssessKey]) return String(r[selfAssessKey]).trim();
+        return '';
+      };
+      const filtered = rows
+        .filter(r => allowedSet[normalizeAppName(r[appKey])])
+        .map((r, i) => ({
+          id: 'r' + i,
+          serviceManager: smKey && r[smKey] ? String(r[smKey]).trim() : '',
+          application: allowedSet[normalizeAppName(r[appKey])],
+          control: ctrlKey && r[ctrlKey] ? String(r[ctrlKey]).trim() : '',
+          applicable: deriveApplicable(r),
+          performedBy: perfKey && r[perfKey] ? String(r[perfKey]).trim() : '',
+          status: deriveStatus(r),
+        }));
+      if (filtered.length === 0) { setCtrlStatus({ type: 'error', msg: 'No rows matched the expected applications.' }); setCtrlLoading(false); return; }
+      const info = { fileName: file.name, importedAt: new Date().toISOString() };
+      setFarolRows(filtered); setFileInfo(info);
+      await persistFarol(filtered, info, false);
+      setFarolLocked(false);
+      setCtrlStatus({ type: 'success', msg: filtered.length + ' controls imported, covering ' + new Set(filtered.map(r => r.application)).size + ' application(s). Remember to lock as Master Data once reviewed.' });
+    } catch (err) {
+      console.error(err);
+      setCtrlStatus({ type: 'error', msg: "Couldn't read the file: " + (err && err.message ? err.message : String(err)) });
+    } finally { setCtrlLoading(false); }
+  };
+  const onCtrlFileChange = (e) => { const f = e.target.files && e.target.files[0]; if (f) handleCtrlFile(f); e.target.value = ''; };
+  const clearCtrlData = async () => {
+    if (!isUnlocked) return;
+    if (farolLocked) { setCtrlStatus({ type: 'error', msg: 'Unlock before clearing the data.' }); return; }
+    setFarolRows([]); setFileInfo(null);
+    try { await window.storageSet('mics2026-farol-data', JSON.stringify({ rows: [], fileName: null, importedAt: null, locked: false })); } catch (e) {}
+  };
+  const toggleFarolLock = async () => {
+    if (!isUnlocked) return;
+    const next = !farolLocked;
+    setFarolLocked(next);
+    await persistFarol(farolRows, fileInfo || { fileName: null, importedAt: new Date().toISOString() }, next);
+  };
+
+  const startEdit = (row) => { setEditingId(row.id); setEditForm(Object.assign({}, row)); };
+  const cancelEdit = () => { setEditingId(null); setEditForm(null); };
+  const saveEdit = async () => {
+    const updated = farolRows.map(r => r.id === editingId ? Object.assign({}, editForm) : r);
+    setFarolRows(updated);
+    await persistFarol(updated, fileInfo || { fileName: null, importedAt: new Date().toISOString() }, farolLocked);
+    setEditingId(null); setEditForm(null);
+  };
+
+  const addNewApp = async () => {
+    const name = newAppName.trim();
+    if (!name) return;
+    if (appsList.some(a => normalizeAppName(a) === normalizeAppName(name))) {
+      setAddingApp(false); setNewAppName(''); return;
+    }
+    const updated = appsList.concat([name]);
+    setAppsList(updated);
+    await persistAppsList(updated);
+    setAddingApp(false); setNewAppName('');
+  };
+
+  const startEditApp = (app, currentSM) => { setEditingApp(app); setEditAppName(app); setEditAppSM(currentSM || ''); };
+  const cancelEditApp = () => { setEditingApp(null); setEditAppName(''); setEditAppSM(''); };
+  const saveEditApp = async () => {
+    const newName = editAppName.trim();
+    if (!newName) { cancelEditApp(); return; }
+    const renaming = newName !== editingApp;
+    const updatedRows = farolRows.map(r => {
+      if (r.application !== editingApp) return r;
+      return Object.assign({}, r, { application: newName, serviceManager: editAppSM });
+    });
+    let updatedAppsList = appsList;
+    if (renaming) {
+      updatedAppsList = appsList.map(a => a === editingApp ? newName : a);
+      setAppsList(updatedAppsList);
+      await persistAppsList(updatedAppsList);
+    }
+    setFarolRows(updatedRows);
+    await persistFarol(updatedRows, fileInfo || { fileName: null, importedAt: new Date().toISOString() }, farolLocked);
+    if (selectedApp === editingApp) setSelectedApp(newName);
+    cancelEditApp();
+  };
+
+  const exportBackup = () => {
+    const snapshot = { version: 1, exportedAt: new Date().toISOString(), periodsData, columnAliases, farolRows, fileInfo, appsList, farolLocked };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'mics360-backup-' + new Date().toISOString().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    setBackupStatus({ type: 'success', msg: 'Backup file downloaded.' });
+  };
+  const onBackupFileChange = async (e) => {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    setBackupStatus(null);
+    try {
+      const text = await file.text();
+      const data = JSON.parse(text);
+      if (!data || typeof data !== 'object') throw new Error('Invalid file');
+      const newPeriods = data.periodsData || {};
+      const newAliases = withColumnDefaults(data.columnAliases || {});
+      const newFarolRows = data.farolRows || [];
+      const newFileInfo = data.fileInfo || null;
+      const newAppsList = data.appsList && data.appsList.length ? data.appsList : DEFAULT_ALLOWED_APPS;
+      const newFarolLocked = !!data.farolLocked;
+      setPeriodsData(newPeriods); setColumnAliases(newAliases); setFarolRows(newFarolRows);
+      setFileInfo(newFileInfo); setAppsList(newAppsList); setFarolLocked(newFarolLocked);
+      await persistPeriods(newPeriods); await persistColAliases(newAliases);
+      await persistFarol(newFarolRows, newFileInfo || { fileName: null, importedAt: new Date().toISOString() }, newFarolLocked);
+      await persistAppsList(newAppsList);
+      const keys = Object.keys(newPeriods).sort();
+      setSelectedPeriod(keys.length ? keys[keys.length - 1] : null);
+      setBackupStatus({ type: 'success', msg: "Backup restored and saved to this device's shared storage." });
+    } catch (err) {
+      console.error(err);
+      setBackupStatus({ type: 'error', msg: "Couldn't read that backup file: " + (err && err.message ? err.message : String(err)) });
+    }
+  };
+
+  const byApp = {};
+  appsList.forEach(a => { byApp[a] = []; });
+  farolRows.forEach(r => { if (!byApp[r.application]) byApp[r.application] = []; byApp[r.application].push(r); });
+  const appStats = appsList.map(a => {
+    const rows = byApp[a] || [];
+    const applicableCount = rows.filter(r => isApplicableTrue(r.applicable)).length;
+    const smSet = Array.from(new Set(rows.map(r => r.serviceManager).filter(Boolean)));
+    return { app: a, total: rows.length, applicableCount, serviceManagers: smSet };
+  });
+  const selectedRows = selectedApp ? (byApp[selectedApp] || []) : [];
+  const filteredSelectedRows = searchTerm
+    ? selectedRows.filter(r =>
+        r.control.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1 ||
+        r.serviceManager.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1 ||
+        r.status.toLowerCase().indexOf(searchTerm.toLowerCase()) !== -1)
+    : selectedRows;
+
+  let lastUpdatedTs = null;
+  Object.values(periodsData).forEach(p => {
+    if (p && p.importedAt) {
+      const t = new Date(p.importedAt).getTime();
+      if (!lastUpdatedTs || t > lastUpdatedTs) lastUpdatedTs = t;
+    }
+  });
+  if (fileInfo && fileInfo.importedAt) {
+    const t = new Date(fileInfo.importedAt).getTime();
+    if (!lastUpdatedTs || t > lastUpdatedTs) lastUpdatedTs = t;
+  }
+  const lastUpdatedLabel = lastUpdatedTs
+    ? new Date(lastUpdatedTs).toLocaleString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : null;
+
+  const TopBar = (
+    <>
+      <div className="w-full bg-neutral-950 border-b border-neutral-800 px-4 sm:px-6 py-3 flex items-center justify-between gap-3">
+        <button onClick={() => setActiveModule(null)} className="flex items-center gap-2.5" disabled={!isUnlocked}>
+          <div className="w-7 h-7 rounded-full border-2 border-yellow-500 flex items-center justify-center">
+            <ShieldCheck className="w-4 h-4 text-yellow-500" />
+          </div>
+          <span className="font-black tracking-wide text-sm">
+            <span className="text-white">MICS</span> <span className="text-yellow-500">MONITORING</span>
+          </span>
+          <span className="text-neutral-700">|</span>
+          <span className="text-white font-semibold text-sm">ABInBev</span>
+        </button>
+        {isUnlocked && (
+          <div className="flex items-center gap-3">
+            {lastUpdatedLabel && (
+              <span className="text-[11px] text-neutral-600 hidden sm:inline">Last updated: {lastUpdatedLabel}</span>
+            )}
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white transition-colors">
+              <Unlock className="w-3.5 h-3.5 text-emerald-400" />
+              Connected as {currentUserName || 'Administrator'}
+              <LogOut className="w-3.5 h-3.5 ml-1" />
+            </button>
+          </div>
+        )}
+      </div>
+      <div className="px-4 sm:px-6 py-2 flex items-center gap-1.5 text-xs text-neutral-500 border-b border-neutral-900">
+        <button onClick={() => setActiveModule(null)} className="flex items-center gap-1.5 hover:text-yellow-500 transition-colors" disabled={!isUnlocked}>
+          <Home className="w-3 h-3" /> Home
+        </button>
+        {activeModule && (
+          <>
+            <span>/</span>
+            <span className="text-neutral-300">{activeModule === 'monitoring' ? 'MICS Tasks' : activeModule === 'controls' ? 'MICS Controls' : activeModule === 'guide' ? (guideSelectedCtrl ? 'Control Detail Guide / ' + guideSelectedCtrl.code : 'Control Detail Guide') : ''}</span>
+          </>
+        )}
+      </div>
+    </>
+  );
+
+  if (!ready || !isUnlocked) {
+    return (
+      <div className="min-h-full w-full bg-black flex flex-col">
+        {TopBar}
+        <div className="flex-1 flex items-center justify-center p-6">
+          {!ready ? <p className="text-neutral-600 text-sm">Loading...</p> : (
+            <div className="w-full max-w-sm border border-yellow-600/25 rounded-lg bg-gradient-to-b from-neutral-950 to-black p-8 text-center">
+              <div className="w-14 h-14 mx-auto rounded-full border-2 border-yellow-500 flex items-center justify-center mb-4">
+                <ShieldCheck className="w-7 h-7 text-yellow-500" />
+              </div>
+              <h1 className="text-2xl font-black mb-1">
+                <span className="text-white">MICS</span> <span className="text-yellow-500">MONITORING</span>
+              </h1>
+              <p className="text-neutral-400 text-sm mb-6">Restricted access for the administrator.</p>
+              <label className="text-xs text-neutral-400 block mb-1 text-left">Username</label>
+              <input type="text" value={loginUsername} onChange={(e) => setLoginUsername(e.target.value)}
+                className="w-full bg-black border border-neutral-700 rounded px-3 py-2.5 text-sm text-white mb-3 focus:outline-none focus:border-yellow-500" placeholder="Admin" autoFocus />
+              <label className="text-xs text-neutral-400 block mb-1 text-left">Password</label>
+              <input type="password" value={loginInput} onChange={(e) => setLoginInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleLogin(); }}
+                className="w-full bg-black border border-neutral-700 rounded px-3 py-2.5 text-sm text-white mb-4 focus:outline-none focus:border-yellow-500" />
+              {loginError && <p className="text-red-400 text-xs mb-3">{loginError}</p>}
+              <button onClick={handleLogin} className="w-full bg-yellow-500 hover:bg-yellow-400 text-black font-semibold py-3 rounded-md transition-colors">Sign in</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  if (!activeModule) {
+    return (
+      <div className="min-h-full w-full bg-black">
+        {TopBar}
+        <div className="p-4 sm:p-6">
+          <div className="max-w-3xl mx-auto border border-yellow-600/20 rounded-lg p-6 sm:p-10 bg-gradient-to-b from-neutral-950 to-black">
+            <p className="text-neutral-500 text-xs mb-2">Hi, {currentUserName || 'MICS Analyst'}</p>
+            <h1 className="text-3xl sm:text-4xl font-black mb-2 leading-tight">
+              <span className="text-white">Welcome to</span> <span className="text-white">MICS</span> <span className="text-yellow-500">MONITORING</span>
+            </h1>
+            <p className="text-white font-semibold text-base mb-1">Global MICS Governance Tool</p>
+            <p className="text-neutral-500 text-sm mb-6">The one stop solution for all matters relating to Global MICS Governance.</p>
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button onClick={() => setActiveModule('monitoring')} className="border border-yellow-500 hover:bg-yellow-500 hover:text-black text-yellow-500 font-semibold px-6 py-2.5 rounded-md transition-colors text-sm bg-transparent">
+                MICS Tasks
+              </button>
+              <button onClick={() => setActiveModule('controls')} className="border border-yellow-500 hover:bg-yellow-500 hover:text-black text-yellow-500 font-semibold px-6 py-2.5 rounded-md transition-colors text-sm bg-transparent">
+                MICS Controls
+              </button>
+              <button onClick={() => { setActiveModule('guide'); setGuideSelectedCtrl(null); }} className="border border-yellow-500 hover:bg-yellow-500 hover:text-black text-yellow-500 font-semibold px-6 py-2.5 rounded-md transition-colors text-sm bg-transparent">
+                Control Detail Guide
+              </button>
+            </div>
+            <div className="mt-8 pt-6 border-t border-neutral-800">
+              <p className="text-neutral-500 text-xs font-semibold mb-1">Backup &amp; Restore</p>
+              {lastUpdatedLabel && (
+                <p className="text-neutral-600 text-xs mb-2">Last data update: {lastUpdatedLabel}</p>
+              )}
+              <p className="text-neutral-600 text-xs mb-3">
+                Manual safety net: download a snapshot of everything, or restore one if needed.
+              </p>
+              {backupStatus && (
+                <div className={'mb-3 flex items-center gap-2 px-3 py-2 rounded-md text-xs font-medium ' + (backupStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/10 text-red-300 border border-red-500/30')}>
+                  {backupStatus.type === 'success' ? <CheckCircle2 className="w-3.5 h-3.5 flex-shrink-0" /> : <AlertCircle className="w-3.5 h-3.5 flex-shrink-0" />}
+                  {backupStatus.msg}
+                </div>
+              )}
+              <div className="flex flex-col sm:flex-row gap-2">
+                <button onClick={exportBackup} className="text-xs bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 px-4 py-2 rounded-md transition-colors font-medium">
+                  Export All Data
+                </button>
+                <input type="file" accept=".json" ref={backupFileInputRef} onChange={onBackupFileChange} className="hidden" />
+                <button onClick={() => backupFileInputRef.current && backupFileInputRef.current.click()} className="text-xs bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 px-4 py-2 rounded-md transition-colors">
+                  Import backup (JSON)
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (activeModule === 'monitoring') {
+    return (
+      <div className="min-h-full w-full bg-black relative">
+        {TopBar}
+        <div className="p-4 sm:p-6">
+          <div className="max-w-5xl mx-auto border border-yellow-600/20 rounded-lg p-4 sm:p-6 bg-gradient-to-b from-neutral-950 to-black">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+              <div>
+                <h1 className="text-2xl sm:text-3xl font-bold text-white">MICS <span className="text-yellow-500">Tasks</span></h1>
+                <p className="text-neutral-400 text-sm mt-1">Direct count of the Status column, by month.</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setShowSettings(s => !s)} className="p-3 rounded-md bg-neutral-900 border border-neutral-700 text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors" title="Column mapping">
+                  <Settings className="w-5 h-5" />
+                </button>
+                <input type="file" accept=".xlsx,.xls,.csv" ref={monFileInputRef} onChange={onMonFileChange} multiple className="hidden" />
+                <button onClick={() => monFileInputRef.current && monFileInputRef.current.click()} disabled={monLoading}
+                  className="flex items-center gap-2 bg-yellow-500 hover:bg-yellow-400 active:scale-95 transition-all text-black font-semibold px-5 py-3 rounded-md shadow-lg shadow-yellow-500/10 disabled:opacity-60 disabled:cursor-not-allowed">
+                  <Upload className="w-5 h-5" />
+                  {monLoading ? 'Importing...' : 'Import monthly tasks'}
+                </button>
+              </div>
+            </div>
+
+            {showSettings && (
+              <div className="absolute left-4 right-4 sm:left-auto sm:right-6 top-32 z-20 sm:w-[26rem] bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl p-5">
+                <div className="flex items-center justify-between mb-3">
+                  <h3 className="text-white font-semibold text-sm">Column mapping</h3>
+                  <button onClick={() => setShowSettings(false)} className="text-neutral-500 hover:text-white"><X className="w-4 h-4" /></button>
+                </div>
+                <p className="text-neutral-500 text-xs mb-4">Just defines which columns to read from the spreadsheet.</p>
+                <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
+                  {Object.keys(DEFAULT_COLUMN_ALIASES).map(field => (
+                    <div key={field}>
+                      <p className="text-yellow-500 text-xs font-semibold mb-1.5">{COLUMN_LABELS[field]}</p>
+                      <div className="flex flex-wrap gap-1.5 mb-2">
+                        {(columnAliases[field] || []).map(a => (
+                          <span key={a} className="flex items-center gap-1 bg-neutral-800 text-neutral-300 text-xs px-2 py-1 rounded">
+                            {a}
+                            <button onClick={() => removeColAlias(field, a)} className="text-neutral-500 hover:text-red-400"><X className="w-3 h-3" /></button>
+                          </span>
+                        ))}
+                      </div>
+                      <div className="flex gap-1.5">
+                        <input type="text" value={newColInput[field] || ''} onChange={(e) => setNewColInput(prev => Object.assign({}, prev, { [field]: e.target.value }))}
+                          onKeyDown={(e) => { if (e.key === 'Enter') addColAlias(field); }} placeholder="new column name..."
+                          className="flex-1 bg-black border border-neutral-700 rounded px-2.5 py-1.5 text-xs text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500" />
+                        <button onClick={() => addColAlias(field)} className="bg-neutral-800 hover:bg-yellow-500 hover:text-black text-neutral-300 rounded px-2.5 transition-colors"><Plus className="w-3.5 h-3.5" /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {monStatus && (
+              <div className={'mb-6 flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium ' + (monStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/10 text-red-300 border border-red-500/30')}>
+                {monStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+                {monStatus.msg}
+              </div>
+            )}
+
+            {periodKeys.length === 0 ? (
+              <div className="bg-neutral-900/50 border border-dashed border-neutral-700 rounded-lg p-12 text-center">
+                <FileSpreadsheet className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+                <p className="text-neutral-300 font-bold tracking-wide">UPLOAD FILE</p>
+                <p className="text-neutral-500 text-sm mt-1">Import the monthly task spreadsheets to get started.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
+                  <Calendar className="w-4 h-4 text-neutral-500 flex-shrink-0" />
+                  <button onClick={() => { selectPeriod('__ALL__'); setDetailStatusKey(null); }}
+                    className={'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-all ' + (isOverview ? 'bg-yellow-500 text-black' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800 border border-neutral-800')}>
+                    <PieChartIcon className="w-3.5 h-3.5" /> Overview (all months)
+                  </button>
+                  <span className="w-px h-5 bg-neutral-800 flex-shrink-0" />
+                  {periodKeys.map(key => (
+                    <button key={key} onClick={() => { selectPeriod(key); setDetailStatusKey(null); }}
+                      className={'flex items-center gap-1.5 px-4 py-2 rounded-md text-sm font-medium whitespace-nowrap transition-all ' + (selectedPeriod === key ? 'bg-yellow-500 text-black' : 'bg-neutral-900 text-neutral-300 hover:bg-neutral-800 border border-neutral-800')}>
+                      {periodsData[key] && periodsData[key].locked ? <Lock className="w-3 h-3" /> : null}
+                      {formatPeriodLabel(key)}
+                    </button>
+                  ))}
+                </div>
+
+                {isOverview && (
+                  <div className="bg-neutral-900 rounded-lg p-5 sm:p-8 border border-neutral-800 mb-6">
+                    <h3 className="text-white font-semibold mb-1 text-sm">Overall delivery — all imported months</h3>
+                    <p className="text-neutral-500 text-xs mb-6">{periodKeys.length} month(s) combined · {overviewTotal} task(s) total</p>
+                    {overviewTotal === 0 ? (
+                      <p className="text-neutral-500 text-sm">No data imported yet.</p>
+                    ) : (
+                      <div className="flex flex-col lg:flex-row items-center gap-8">
+                        <DonutChart
+                          segments={overviewKeysSorted.map(k => ({ key: k, count: overviewStatusCounts[k].count, color: colorHexForKey(k) }))}
+                          total={overviewTotal} size={220} thickness={34} />
+                        <div className="flex-1 w-full space-y-3">
+                          {overviewKeysSorted.map(key => {
+                            const c = colorForKey(key);
+                            const pct = overviewTotal > 0 ? (overviewStatusCounts[key].count / overviewTotal) * 100 : 0;
+                            return (
+                              <div key={key} className="w-full">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className="flex items-center gap-2">
+                                    <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: colorHexForKey(key) }} />
+                                    <span className={c.text}>{overviewStatusCounts[key].label}</span>
+                                  </span>
+                                  <span className="text-neutral-500">{overviewStatusCounts[key].count} ({pct.toFixed(1)}%)</span>
+                                </div>
+                                <div className="w-full bg-neutral-800 rounded-full h-2">
+                                  <div className={c.bar + ' h-2 rounded-full transition-all'} style={{ width: pct + '%' }} />
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {periodKeys.length > 0 && overviewTotal > 0 && (
+                      <div className="mt-8 overflow-x-auto">
+                        <h4 className="text-white font-semibold mb-3 text-sm">By month</h4>
+                        <table className="w-full text-xs">
+                          <thead>
+                            <tr className="text-neutral-500 border-b border-neutral-800">
+                              <th className="text-left py-2 pr-4 font-medium">Month</th>
+                              {overviewKeysSorted.map(key => (
+                                <th key={key} className="px-3 py-2 font-medium text-right whitespace-nowrap">{overviewStatusCounts[key].label}</th>
+                              ))}
+                              <th className="px-3 py-2 font-medium text-right">Total</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {periodKeys.map(pk => (
+                              <tr key={pk} className="border-b border-neutral-900 hover:bg-neutral-800/40">
+                                <td className="py-2 pr-4 text-neutral-300 whitespace-nowrap">{formatPeriodLabel(pk)}</td>
+                                {overviewKeysSorted.map(key => (
+                                  <td key={key} className="px-3 py-2 text-right text-neutral-400">{(overviewByMonth[pk] && overviewByMonth[pk][key]) || 0}</td>
+                                ))}
+                                <td className="px-3 py-2 text-right font-medium text-white">{(overviewByMonth[pk] && overviewByMonth[pk].total) || 0}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {current && (
+                  <>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-6">
+                      <div className="bg-neutral-900 rounded-lg p-5 border border-neutral-800">
+                        <p className="text-neutral-500 text-xs font-medium mb-2">Total Tasks</p>
+                        <p className="text-2xl font-bold text-white">{totalTasks}</p>
+                      </div>
+                      {statusKeysSorted.map(key => {
+                        const c = colorForKey(key);
+                        return (
+                          <button key={key} onClick={() => setDetailStatusKey(key)} className="text-left bg-neutral-900 rounded-lg p-5 border border-neutral-800 hover:border-yellow-500/60 hover:bg-neutral-800/80 transition-colors cursor-pointer">
+                            <p className={'text-xs font-medium mb-2 ' + c.text}>{statusCounts[key].label}</p>
+                            <p className="text-2xl font-bold text-white">{statusCounts[key].count}</p>
+                            <p className="text-xs text-neutral-600 mt-1">View tasks →</p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {statusKeysSorted.length > 0 && (
+                      <div className="bg-neutral-900 rounded-lg p-5 border border-neutral-800 mb-6">
+                        <h3 className="text-white font-semibold mb-4 text-sm">Status Distribution — {formatPeriodLabel(selectedPeriod)}</h3>
+                        <div className="space-y-3">
+                          {statusKeysSorted.map(key => {
+                            const c = colorForKey(key);
+                            const pct = totalTasks > 0 ? (statusCounts[key].count / totalTasks) * 100 : 0;
+                            return (
+                              <button key={key} onClick={() => setDetailStatusKey(key)} className="w-full text-left group">
+                                <div className="flex justify-between text-sm mb-1">
+                                  <span className={c.text + ' group-hover:underline'}>{statusCounts[key].label}</span>
+                                  <span className="text-neutral-500">{statusCounts[key].count} ({pct.toFixed(1)}%)</span>
+                                </div>
+                                <div className="w-full bg-neutral-800 rounded-full h-2">
+                                  <div className={c.bar + ' h-2 rounded-full transition-all'} style={{ width: pct + '%' }} />
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className={'bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden'}>
+                      <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+                        <div className="min-w-0">
+                          <h3 className="text-white font-semibold">Details — {formatPeriodLabel(selectedPeriod)}</h3>
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <Files className="w-3.5 h-3.5 text-neutral-600 flex-shrink-0" />
+                            <p className="text-xs text-neutral-500 truncate">{current.files ? current.files.join(' · ') : ''}</p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button onClick={() => toggleLockPeriod(selectedPeriod)}
+                            className={'flex items-center gap-1.5 text-xs px-2.5 py-2 rounded-md transition-colors ' + (current.locked ? 'text-yellow-500 hover:bg-neutral-800' : 'text-neutral-500 hover:bg-neutral-800')}
+                            title={current.locked ? 'Unlock this month' : 'Lock this month'}>
+                            {current.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                            {current.locked ? 'Locked' : 'Open'}
+                          </button>
+                          {!current.locked && (
+                            <button onClick={() => deletePeriod(selectedPeriod)} className="text-neutral-500 hover:text-red-400 transition-colors p-2" title="Remove this period">
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {(appNames.length > 1 || (appNames.length === 1 && appNames[0] !== 'General')) && (
+                        <div className="max-h-96 overflow-y-auto overflow-x-auto">
+                          <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-neutral-900 border-b border-neutral-800">
+                              <tr className="text-neutral-500 text-left">
+                                <th className="px-5 py-2 font-medium whitespace-nowrap">Application</th>
+                                {statusKeysSorted.map(key => <th key={key} className="px-5 py-2 font-medium text-right whitespace-nowrap">{statusCounts[key].label}</th>)}
+                                <th className="px-5 py-2 font-medium text-right whitespace-nowrap">Total</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {appNames.map(app => (
+                                <tr key={app} className="border-t border-neutral-800 text-neutral-300 hover:bg-neutral-800/50">
+                                  <td className="px-5 py-2 font-medium text-white whitespace-nowrap">{app}</td>
+                                  {statusKeysSorted.map(key => <td key={key} className="px-5 py-2 text-right">{appBreakdown[app][key] || 0}</td>)}
+                                  <td className="px-5 py-2 text-right font-medium">{appBreakdown[app].total}</td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </div>
+        </div>
+
+        {detailStatusKey && (
+          <div className="fixed inset-0 z-30 bg-black/80 flex items-start sm:items-center justify-center p-4 overflow-y-auto" onClick={() => setDetailStatusKey(null)}>
+            <div className="bg-neutral-900 border border-neutral-700 rounded-lg shadow-2xl w-full max-w-4xl my-8" onClick={(e) => e.stopPropagation()}>
+              <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
+                <div>
+                  <h3 className="text-white font-semibold">{statusCounts[detailStatusKey] ? statusCounts[detailStatusKey].label : ''} — {formatPeriodLabel(selectedPeriod)}</h3>
+                  <p className="text-xs text-neutral-500 mt-0.5">{detailTasks.length} task(s) found</p>
+                </div>
+                <button onClick={() => setDetailStatusKey(null)} className="text-neutral-500 hover:text-white p-2"><X className="w-5 h-5" /></button>
+              </div>
+              <div className="max-h-[70vh] overflow-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-neutral-900 border-b border-neutral-800">
+                    <tr className="text-neutral-500 text-left">
+                      <th className="px-4 py-2 font-medium whitespace-nowrap">Application</th>
+                      {detailColumns.map(col => <th key={col} className="px-4 py-2 font-medium whitespace-nowrap">{col}</th>)}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {detailTasks.map((t, i) => (
+                      <tr key={i} className="border-t border-neutral-800 text-neutral-300 hover:bg-neutral-800/50">
+                        <td className="px-4 py-2 font-medium text-white whitespace-nowrap">{t.aplicacao}</td>
+                        {detailColumns.map(col => (
+                          <td key={col} className="px-4 py-2 whitespace-nowrap">
+                            {t.raw && t.raw[col] instanceof Date ? t.raw[col].toLocaleDateString('en-US') : (t.raw ? String(t.raw[col]) : '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  if (activeModule === 'guide') {
+    return (
+      <div className="min-h-full w-full bg-black">
+        {TopBar}
+        <div className="p-4 sm:p-6">
+          <div className="max-w-5xl mx-auto border border-yellow-600/20 rounded-lg p-4 sm:p-6 bg-gradient-to-b from-neutral-950 to-black">
+            {guideSelectedCtrl
+              ? <GuideDetailView ctrl={guideSelectedCtrl} onBack={() => setGuideSelectedCtrl(null)} />
+              : <GuideGridView onOpen={(c) => setGuideSelectedCtrl(c)} />
+            }
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-full w-full bg-black relative">
+      {TopBar}
+      <div className="p-4 sm:p-6">
+        <div className="max-w-5xl mx-auto border border-yellow-600/20 rounded-lg p-4 sm:p-6 bg-gradient-to-b from-neutral-950 to-black">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+            <div>
+              <h1 className="text-2xl sm:text-3xl font-bold text-white">MICS <span className="text-yellow-500">Controls</span></h1>
+              <p className="text-neutral-400 text-sm mt-1">Applicable controls by application and Service Manager.</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {farolRows.length > 0 && (
+                <>
+                  <button onClick={toggleFarolLock}
+                    className={'flex items-center gap-1.5 text-xs px-3 py-3 rounded-md border transition-colors ' + (farolLocked ? 'text-yellow-500 border-yellow-600/40 bg-neutral-900 hover:bg-neutral-800' : 'text-neutral-400 border-neutral-700 bg-neutral-900 hover:bg-neutral-800')}
+                    title={farolLocked ? 'Unlock Master Data' : 'Lock as Master Data'}>
+                    {farolLocked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+                    {farolLocked ? 'Locked' : 'Open'}
+                  </button>
+                  {!farolLocked && (
+                    <button onClick={clearCtrlData} className="p-3 rounded-md bg-neutral-900 border border-neutral-700 text-neutral-400 hover:text-red-400 hover:bg-neutral-800 transition-colors" title="Clear data">
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  )}
+                </>
+              )}
+              <input type="file" accept=".xlsx,.xls,.csv" ref={ctrlFileInputRef} onChange={onCtrlFileChange} className="hidden" />
+              <button
+                onClick={() => { if (farolLocked) { setCtrlStatus({ type: 'error', msg: 'Data is locked as Master Data. Unlock before importing.' }); return; } ctrlFileInputRef.current && ctrlFileInputRef.current.click(); }}
+                disabled={ctrlLoading}
+                className={'flex items-center gap-2 font-semibold px-5 py-3 rounded-md transition-all disabled:opacity-60 disabled:cursor-not-allowed ' + (farolLocked ? 'bg-neutral-800 text-neutral-500 border border-neutral-700' : 'bg-yellow-500 hover:bg-yellow-400 active:scale-95 text-black shadow-lg shadow-yellow-500/10')}>
+                <Upload className="w-5 h-5" />
+                {ctrlLoading ? 'Importing...' : 'Import MICS Controls'}
+              </button>
+            </div>
+          </div>
+
+          {ctrlStatus && (
+            <div className={'mb-6 flex items-center gap-2 px-4 py-3 rounded-md text-sm font-medium ' + (ctrlStatus.type === 'success' ? 'bg-emerald-500/10 text-emerald-300 border border-emerald-500/30' : 'bg-red-500/10 text-red-300 border border-red-500/30')}>
+              {ctrlStatus.type === 'success' ? <CheckCircle2 className="w-4 h-4 flex-shrink-0" /> : <AlertCircle className="w-4 h-4 flex-shrink-0" />}
+              {ctrlStatus.msg}
+            </div>
+          )}
+
+          {farolRows.length === 0 ? (
+            <div className="bg-neutral-900/50 border border-dashed border-neutral-700 rounded-lg p-12 text-center">
+              <FileSpreadsheet className="w-12 h-12 text-neutral-600 mx-auto mb-3" />
+              <p className="text-neutral-300 font-bold tracking-wide">UPLOAD FILE</p>
+              <p className="text-neutral-500 text-sm mt-1">Import the "FAROL MICS" file — I read the Control Applicability tab and filter to the expected applications.</p>
+            </div>
+          ) : selectedApp ? (
+            <>
+              <button onClick={() => { setSelectedApp(null); setSearchTerm(''); cancelEdit(); }} className="flex items-center gap-1.5 text-sm text-neutral-400 hover:text-yellow-500 transition-colors mb-4">
+                <ArrowLeft className="w-4 h-4" /> Back to all applications
+              </button>
+
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
+                <h2 className="text-xl font-bold text-white">{selectedApp}</h2>
+                <div className="relative w-full sm:w-64">
+                  <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input type="text" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} placeholder="Search control, SM, status..."
+                    className="w-full bg-neutral-900 border border-neutral-700 rounded-md pl-9 pr-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500" />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <p className="text-neutral-500 text-xs font-medium mb-1">Total Controls</p>
+                  <p className="text-xl font-bold text-white">{selectedRows.length}</p>
+                </div>
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <p className="text-emerald-400 text-xs font-medium mb-1">Applicable</p>
+                  <p className="text-xl font-bold text-white">{selectedRows.filter(r => isApplicableTrue(r.applicable)).length}</p>
+                </div>
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <p className="text-neutral-500 text-xs font-medium mb-1">Not Applicable</p>
+                  <p className="text-xl font-bold text-white">{selectedRows.filter(r => !isApplicableTrue(r.applicable)).length}</p>
+                </div>
+                <div className="bg-neutral-900 rounded-lg p-4 border border-neutral-800">
+                  <p className="text-yellow-500 text-xs font-medium mb-1">Service Managers</p>
+                  <p className="text-xl font-bold text-white">{new Set(selectedRows.map(r => r.serviceManager).filter(Boolean)).size}</p>
+                </div>
+              </div>
+
+              <div className="bg-neutral-900 rounded-lg border border-neutral-800 overflow-hidden">
+                <div className="max-h-[28rem] overflow-y-auto overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="sticky top-0 bg-neutral-900 border-b border-neutral-800">
+                      <tr className="text-neutral-500 text-left">
+                        <th className="px-3 py-2 font-medium text-center sticky left-0 bg-neutral-900 z-10">Edit</th>
+                        <th className="px-4 py-2 font-medium whitespace-nowrap">MICS Control</th>
+                        <th className="px-4 py-2 font-medium whitespace-nowrap">Applicable?</th>
+                        <th className="px-4 py-2 font-medium whitespace-nowrap">Performed By</th>
+                        <th className="px-4 py-2 font-medium whitespace-nowrap">Status</th>
+                        <th className="px-4 py-2 font-medium whitespace-nowrap">Service Manager</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredSelectedRows.map((r) => {
+                        const editing = editingId === r.id;
+                        return (
+                          <tr key={r.id} className="border-t border-neutral-800 text-neutral-300 hover:bg-neutral-800/50">
+                            <td className="px-3 py-2 text-center sticky left-0 bg-neutral-900 z-10">
+                              {editing ? (
+                                <>
+                                  <button onClick={saveEdit} className="text-emerald-400 hover:text-emerald-300 p-1" title="Save"><Save className="w-4 h-4 inline" /></button>
+                                  <button onClick={cancelEdit} className="text-neutral-500 hover:text-red-400 p-1 ml-1" title="Cancel"><Ban className="w-4 h-4 inline" /></button>
+                                </>
+                              ) : (
+                                <button onClick={() => startEdit(r)} className="text-yellow-500 hover:text-yellow-400 p-1" title="Edit">
+                                  <Pencil className="w-4 h-4 inline" />
+                                </button>
+                              )}
+                            </td>
+                            <td className="px-4 py-2 font-medium text-white whitespace-nowrap">{r.control}</td>
+                            {editing ? (
+                              <>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <select value={editForm.applicable} onChange={(e) => setEditForm(prev => Object.assign({}, prev, { applicable: e.target.value }))}
+                                    className="bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white focus:outline-none focus:border-yellow-500">
+                                    <option value="Yes">Yes</option>
+                                    <option value="No">No</option>
+                                  </select>
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <input type="text" value={editForm.performedBy} onChange={(e) => setEditForm(prev => Object.assign({}, prev, { performedBy: e.target.value }))}
+                                    className="bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white w-32 focus:outline-none focus:border-yellow-500" />
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <input type="text" value={editForm.status} onChange={(e) => setEditForm(prev => Object.assign({}, prev, { status: e.target.value }))}
+                                    className="bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white w-32 focus:outline-none focus:border-yellow-500" />
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <input type="text" value={editForm.serviceManager} onChange={(e) => setEditForm(prev => Object.assign({}, prev, { serviceManager: e.target.value }))}
+                                    className="bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white w-32 focus:outline-none focus:border-yellow-500" />
+                                </td>
+                              </>
+                            ) : (
+                              <>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <span className={'inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs border ' + (isApplicableTrue(r.applicable) ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30' : 'text-neutral-400 bg-neutral-500/10 border-neutral-500/30')}>
+                                    {isApplicableTrue(r.applicable) ? <ShieldCheck className="w-3 h-3" /> : <ShieldOff className="w-3 h-3" />}
+                                    {r.applicable || '—'}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">{r.performedBy || '—'}</td>
+                                <td className="px-4 py-2 whitespace-nowrap">
+                                  <span className={'inline-flex items-center px-2 py-0.5 rounded text-xs border ' + statusColor(r.status)}>{r.status || '—'}</span>
+                                </td>
+                                <td className="px-4 py-2 whitespace-nowrap">{r.serviceManager || '—'}</td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              {fileInfo && fileInfo.fileName && <p className="text-xs text-neutral-500 mb-4">Source: {fileInfo.fileName}</p>}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {appStats.map(({ app, total, applicableCount, serviceManagers }) => {
+                  const isEditingThis = editingApp === app;
+                  if (isEditingThis) {
+                    return (
+                      <div key={app} className="text-left rounded-lg p-3 border border-yellow-500/60 bg-neutral-900">
+                        <label className="text-[10px] text-neutral-500 block mb-0.5">Application name</label>
+                        <input type="text" value={editAppName} onChange={(e) => setEditAppName(e.target.value)}
+                          className="w-full bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white mb-2 focus:outline-none focus:border-yellow-500" />
+                        <label className="text-[10px] text-neutral-500 block mb-0.5">Service Manager (applies to all controls)</label>
+                        <input type="text" value={editAppSM} onChange={(e) => setEditAppSM(e.target.value)}
+                          className="w-full bg-black border border-neutral-700 rounded px-2 py-1 text-xs text-white mb-2 focus:outline-none focus:border-yellow-500" />
+                        <div className="flex items-center gap-2">
+                          <button onClick={saveEditApp} className="text-emerald-400 hover:text-emerald-300 p-1" title="Save"><Save className="w-4 h-4" /></button>
+                          <button onClick={cancelEditApp} className="text-neutral-500 hover:text-red-400 p-1" title="Cancel"><Ban className="w-4 h-4" /></button>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <div key={app}
+                      className={'relative text-left rounded-lg p-3 border transition-colors ' + (total === 0 ? 'bg-neutral-900/40 border-neutral-800' : 'bg-neutral-900 border-neutral-800 hover:border-yellow-500/60 hover:bg-neutral-800/80')}>
+                      {isUnlocked && (
+                        <button onClick={() => startEditApp(app, serviceManagers[0] || '')} className="absolute top-2 right-2 text-neutral-600 hover:text-yellow-500 p-1" title="Edit application">
+                          <Pencil className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                      <button onClick={() => total > 0 && setSelectedApp(app)} disabled={total === 0} className="w-full text-left disabled:cursor-not-allowed">
+                        <h3 className="text-white font-semibold text-sm mb-1.5 pr-5 truncate" title={app}>{app}</h3>
+                        {total === 0 ? (
+                          <p className="text-neutral-600 text-xs">No data</p>
+                        ) : (
+                          <>
+                            <div className="flex items-center gap-3 mb-1.5">
+                              <div>
+                                <p className="text-neutral-500 text-[10px]">Controls</p>
+                                <p className="text-base font-bold text-white">{total}</p>
+                              </div>
+                              <div>
+                                <p className="text-neutral-500 text-[10px]">Applicable</p>
+                                <p className="text-base font-bold text-emerald-400">{applicableCount}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-start gap-1 text-[11px] text-neutral-400" title={serviceManagers.join(', ')}>
+                              <Users className="w-3 h-3 flex-shrink-0 mt-0.5" />
+                              <span className="truncate">{serviceManagers.length ? serviceManagers.join(', ') : '—'}</span>
+                            </div>
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  );
+                })}
+
+                {isUnlocked && (addingApp ? (
+                  <div className="text-left rounded-lg p-3 border border-yellow-500/60 bg-neutral-900">
+                    <label className="text-[10px] text-neutral-500 block mb-0.5">New application name</label>
+                    <input type="text" value={newAppName} onChange={(e) => setNewAppName(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') addNewApp(); }}
+                      placeholder="e.g. New Application X" autoFocus
+                      className="w-full bg-black border border-neutral-700 rounded px-2 py-1.5 text-xs text-white mb-2 focus:outline-none focus:border-yellow-500" />
+                    <div className="flex items-center gap-2">
+                      <button onClick={addNewApp} className="text-emerald-400 hover:text-emerald-300 p-1" title="Add"><Save className="w-4 h-4" /></button>
+                      <button onClick={() => { setAddingApp(false); setNewAppName(''); }} className="text-neutral-500 hover:text-red-400 p-1" title="Cancel"><Ban className="w-4 h-4" /></button>
+                    </div>
+                  </div>
+                ) : (
+                  <button onClick={() => setAddingApp(true)} className="flex flex-col items-center justify-center gap-1 rounded-lg p-3 border border-dashed border-neutral-700 hover:border-yellow-500/60 text-neutral-500 hover:text-yellow-500 transition-colors min-h-[6rem]">
+                    <Plus className="w-6 h-6" />
+                    <span className="text-xs">New application</span>
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<MicsSuite />);
+</script>
+</body>
+</html>
